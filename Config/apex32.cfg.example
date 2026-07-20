@@ -1,0 +1,6 @@
+# APEX32 Community configuration format, schema version 1.
+# The graphical installer generates this file. Users do not need to edit it.
+APEX32CFG|1
+ENTRY|KALI LINUX|\EFI\kali\grubx64.efi|kali
+ENTRY|BLACKARCH LINUX|\EFI\BlackArch_Linux\grubx64.efi|blackarch
+ENTRY|WINDOWS BOOT MANAGER|\EFI\Microsoft\Boot\bootmgfw.efi|windows

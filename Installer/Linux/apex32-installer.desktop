@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=APEX32 Community Installer
+Comment=Discover operating systems and install APEX32 Secure Gateway
+Exec=apex32-installer
+Icon=computer
+Categories=System;Settings;
+Terminal=false

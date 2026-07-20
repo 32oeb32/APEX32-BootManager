@@ -1,0 +1,13 @@
+## @file
+# APEX32 Boot Manager package declaration.
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION = 0x00010005
+  PACKAGE_NAME      = Apex32BootManagerPkg
+  PACKAGE_GUID      = C22C920E-176D-48D7-86B7-D2A02D0BCED3
+  PACKAGE_VERSION   = 0.10.0
+
+[Includes]
+  .

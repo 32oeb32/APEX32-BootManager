@@ -1,0 +1,13 @@
+/Build/
+/Conf/
+*.log
+*.efi
+*.fd
+*.rom
+*.map
+*.pdb
+*.pyc
+__pycache__/
+/cmake-build-*/
+/Installer/Linux/build/
+*.user

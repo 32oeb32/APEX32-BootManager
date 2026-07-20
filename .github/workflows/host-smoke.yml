@@ -1,0 +1,16 @@
+name: host-smoke
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  sanitized-host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sanitized firmware and lifecycle tests
+        run: ./Tools/test-host.sh

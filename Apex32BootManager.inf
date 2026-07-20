@@ -1,0 +1,41 @@
+## @file
+# APEX32 Boot Manager UEFI application module.
+#
+##
+
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = Apex32BootManager
+  FILE_GUID      = 74A33E00-46F1-47DE-ADF4-3DFB57A19B8D
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.10.0
+  ENTRY_POINT    = UefiMain
+
+# VALID_ARCHITECTURES = X64
+
+[Sources]
+  Animation/IntroAnimation.cpp
+  Assets/OsLogos.cpp
+  Boot/BootDiscovery.cpp
+  Boot/EfiLoader.cpp
+  BootManager/Main.cpp
+  Config/BootConfig.cpp
+  Fonts/Font5x7.cpp
+  Menu/WorkspaceMenu.cpp
+  Renderer/GopRenderer.cpp
+
+[Packages]
+  MdePkg/MdePkg.dec
+  APEX32-BootManager/Apex32BootManager.dec
+
+[LibraryClasses]
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid ## CONSUMES
+  gEfiLoadedImageProtocolGuid    ## CONSUMES
+  gEfiSimpleFileSystemProtocolGuid ## CONSUMES

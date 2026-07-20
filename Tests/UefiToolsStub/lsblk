@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+case "${2:-}" in
+  PKNAME)
+    printf 'nvme0n1\n'
+    ;;
+  PARTN)
+    printf '1\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
