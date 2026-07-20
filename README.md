@@ -27,6 +27,7 @@ personal APEX32 installation or development tree.
 - same-ESP loader verification before a card can boot;
 - F2 read-only diagnostics;
 - a Linux Qt 6 installer prototype with **Systems → Scan Now**;
+- graphical authorization for read-only discovery on root-only ESP mounts;
 - a polkit-authorized helper design for installing APEX32 and making it first
   in the UEFI boot order without terminal commands; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
@@ -36,6 +37,11 @@ This is an alpha source milestone, not yet a universal production installer.
 The current firmware executes loaders located on its own EFI System Partition.
 Multi-ESP device resolution, signed release artifacts, distro packages, and
 the completed recovery GUI remain release gates.
+
+Installer contributors can run a root-refusing mock-ESP test and a visibly
+disabled safe GUI demo without touching their boot configuration. See
+[Installer testing](Docs/INSTALLER_TESTING.md). These contributor commands are
+temporary; packaged beta users will launch the installer from their desktop.
 
 ## Build the firmware
 

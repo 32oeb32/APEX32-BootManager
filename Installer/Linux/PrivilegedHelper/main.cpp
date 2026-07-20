@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
@@ -10,7 +11,74 @@
 
 #include <unistd.h>
 
+#include <algorithm>
+
 namespace {
+
+[[nodiscard]] bool RequireRoot(QString* Error) {
+  if (geteuid() == 0) {
+    return true;
+  }
+  *Error = QStringLiteral(
+      "helper must run through the graphical authorization prompt");
+  return false;
+}
+
+[[nodiscard]] bool Scan(
+    const QString& EspArgument,
+    QByteArray* Protocol,
+    QString* Error) {
+  if (!RequireRoot(Error)) {
+    return false;
+  }
+
+  const QFileInfo EspInfo(EspArgument);
+  const QString Esp = EspInfo.canonicalFilePath();
+  const QDir EfiDirectory(QDir(Esp).filePath(QStringLiteral("EFI")));
+  if (Esp.isEmpty() || !EspInfo.isDir() || !EfiDirectory.exists()) {
+    *Error = QStringLiteral("invalid EFI System Partition mount point");
+    return false;
+  }
+
+  QStringList LoaderPaths;
+  QDirIterator Iterator(
+      EfiDirectory.absolutePath(),
+      QDir::Files,
+      QDirIterator::Subdirectories);
+  while (Iterator.hasNext() && LoaderPaths.size() < 256) {
+    const QString AbsolutePath = Iterator.next();
+    if (!AbsolutePath.endsWith(QStringLiteral(".efi"), Qt::CaseInsensitive)) {
+      continue;
+    }
+
+    QString Relative = QDir(Esp).relativeFilePath(AbsolutePath);
+    Relative.replace('/', '\\');
+    const QString LoaderPath = QStringLiteral("\\") + Relative;
+    const QString Lower = LoaderPath.toLower();
+    if (Lower.contains(QStringLiteral("\\efi\\apex32\\")) ||
+        LoaderPath.contains('|') || LoaderPath.contains('\n') ||
+        LoaderPath.contains('\r')) {
+      continue;
+    }
+    LoaderPaths.push_back(LoaderPath);
+  }
+
+  std::sort(
+      LoaderPaths.begin(),
+      LoaderPaths.end(),
+      [](const QString& Left, const QString& Right) {
+        return Left.compare(Right, Qt::CaseInsensitive) < 0;
+      });
+
+  QByteArray Result("APEX32SCAN|1\n");
+  for (const QString& LoaderPath : LoaderPaths) {
+    Result += "LOADER|";
+    Result += LoaderPath.toUtf8();
+    Result += '\n';
+  }
+  *Protocol = Result;
+  return true;
+}
 
 [[nodiscard]] bool CopyAtomically(
     const QString& Source,
@@ -56,8 +124,7 @@ namespace {
     const QString& FirmwareArgument,
     const QString& ConfigArgument,
     QString* Error) {
-  if (geteuid() != 0) {
-    *Error = QStringLiteral("helper must run through the graphical authorization prompt");
+  if (!RequireRoot(Error)) {
     return false;
   }
 
@@ -195,7 +262,21 @@ int main(int argc, char** argv) {
   QCoreApplication Application(argc, argv);
   QTextStream ErrorStream(stderr);
   const QStringList Arguments = Application.arguments();
-  if ((Arguments.size() != 5) || (Arguments.at(1) != QStringLiteral("install"))) {
+  if ((Arguments.size() == 3) &&
+      (Arguments.at(1) == QStringLiteral("scan"))) {
+    QString Error;
+    QByteArray Protocol;
+    if (!Scan(Arguments.at(2), &Protocol, &Error)) {
+      ErrorStream << Error << '\n';
+      return 1;
+    }
+    QTextStream OutputStream(stdout);
+    OutputStream << QString::fromUtf8(Protocol);
+    return 0;
+  }
+
+  if ((Arguments.size() != 5) ||
+      (Arguments.at(1) != QStringLiteral("install"))) {
     ErrorStream << "invalid helper request\n";
     return 2;
   }

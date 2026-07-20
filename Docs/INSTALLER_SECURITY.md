@@ -16,3 +16,14 @@ desktop GUI into a permanently privileged process.
 
 The alpha helper currently depends on `findmnt`, `lsblk`, and `efibootmgr` at
 fixed `/usr/bin` paths. Packaging must declare and verify these dependencies.
+
+The GUI also provides an explicit regular-user test mode backed by a temporary
+mock ESP. Test mode disables installation and never invokes the helper. See
+[`INSTALLER_TESTING.md`](INSTALLER_TESTING.md).
+
+Many distributions mount the real ESP with root-only permissions. The GUI
+first attempts unprivileged read-only discovery. An explicit **Scan Now** may
+invoke the same narrowly scoped helper through a graphical authorization
+prompt with the `scan` operation. That operation emits only bounded EFI loader
+paths and cannot write files or firmware variables. Multi-ESP enumeration is
+still required before beta.
