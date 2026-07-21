@@ -1,52 +1,193 @@
-# Installer testing
+# Source installer testing
 
-The Community installer is tested in two deliberately separate phases. The
-first phase is safe for a contributor's normal desktop session. The second
-phase changes firmware state and belongs in QEMU/OVMF before hardware.
+This guide is for contributors and technical users who are comfortable cloning
+a repository and running build commands. The eventual packaged APEX32 installer
+must remain a desktop application that does not ask end users to type commands.
 
-## Regular-user phase
+The tests are deliberately split into safe mock-ESP testing and an authorized,
+read-only scan of the real EFI System Partition (ESP). The alpha helper's
+`install` operation is not approved for daily-use hardware yet.
 
-The regular-user test:
+## Safety rules
 
-- refuses to run as root;
-- builds the Qt GUI and privileged helper;
-- creates a temporary mock EFI System Partition;
-- discovers Windows, Kali, Ubuntu, and a generic EFI tool;
-- verifies that shim is preferred over GRUB for the same system;
-- verifies that APEX32 never discovers itself as a boot target;
-- generates schema 1 configuration in memory;
-- confirms that the helper refuses a direct unprivileged install; and
-- confirms that the mock ESP is unchanged.
+- Use a fresh clone, separate from any personal APEX32 development tree.
+- Run the GUI and all test scripts as the normal desktop user, never with
+  `sudo`.
+- Do not press **Install** during the authorized-scan test.
+- Do not copy files to the ESP or change UEFI variables as part of this guide.
+- Stop if a password prompt appears inside the terminal. Authentication must be
+  handled by the desktop's graphical PolicyKit agent.
 
-On Debian and Kali, contributors install the build dependencies once:
+## 1. Install source-test dependencies
+
+On current Kali or Debian-based systems:
 
 ```bash
-sudo apt install build-essential cmake ninja-build qt6-base-dev
+sudo apt update
+sudo apt install --yes \
+  git \
+  build-essential \
+  cmake \
+  ninja-build \
+  qt6-base-dev
 ```
 
-Run the automated test **without sudo**:
+A graphical PolicyKit authentication agent is also required for the real ESP
+scan. Desktop environments such as GNOME and KDE normally provide one. On
+Hyprland under Kali, install and start `hyprpolkitagent`:
 
 ```bash
+sudo apt install --yes hyprpolkitagent
+systemctl --user start hyprpolkitagent.service
+systemctl --user is-active hyprpolkitagent.service
+```
+
+The final command must print `active`. Starting this user service does not grant
+APEX32 permanent root access; it only provides the desktop password dialog used
+by PolicyKit.
+
+## 2. Clone a clean copy
+
+For the default branch:
+
+```bash
+TEST_DIR="$HOME/Documents/APEX32-Community-Test-$(date +%Y%m%d-%H%M%S)"
+
+git clone --depth 1 \
+  https://github.com/32oeb32/APEX32-BootManager.git \
+  "$TEST_DIR"
+
+cd "$TEST_DIR"
+```
+
+To test a named candidate branch before it is merged, add
+`--branch BRANCH_NAME` to the clone command. For example:
+
+```bash
+git clone --depth 1 \
+  --branch installer/authorized-scan \
+  https://github.com/32oeb32/APEX32-BootManager.git \
+  "$TEST_DIR"
+```
+
+## 3. Run the non-privileged automated tests
+
+Run both suites without `sudo`:
+
+```bash
+./Tools/test-host.sh
 ./Tools/test-installer-user.sh
 ```
 
-To inspect the GUI safely, first build it and then launch the demo:
+Expected final lines include:
+
+```text
+PASS: 67 frames, 7 keys, dynamic config and manual boot paths clean
+PASS: UEFI entry lifecycle, verbose parsing, duplicate guard, and rollback
+PASS: fallback install, immutable backup, status, and restore
+PASS: regular-user discovery found 4 systems, preferred shim, excluded APEX32, parsed authorized scan, and generated schema 1
+PASS: helper refused unprivileged scan/install and the mock ESP was unchanged
+PASS: regular-user installer test completed without sudo
+```
+
+The installer test creates a temporary mock ESP, detects Windows, Kali, Ubuntu,
+and a generic EFI tool, then deletes the temporary directory. It never invokes
+PolicyKit and never touches the real ESP.
+
+## 4. Inspect the safe GUI demo
+
+Build the two installer binaries as the normal user:
 
 ```bash
-./Tools/build-installer.sh
+cmake \
+  -S Installer/Linux \
+  -B Installer/Linux/build \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build Installer/Linux/build --parallel
+```
+
+Launch the mock-ESP demo:
+
+```bash
 ./Tools/run-installer-demo.sh
 ```
 
-The demo displays a prominent safe-test banner and disables installation. It
-does not invoke polkit, access the real ESP, or change UEFI variables.
+The window must show a cyan safe-test banner, mock operating systems, and a
+disabled **Install** button. Close the window after inspection.
 
-These are contributor QA commands. The public beta package must expose a
-desktop launcher and require no terminal commands from end users.
+## 5. Perform the authorized read-only ESP scan
 
-## Privileged phase
+Confirm the graphical authorization agent is running. Hyprland users can use:
 
-The helper's `scan` operation is read-only and may be exercised against a
-root-only ESP through the GUI's **Scan Now** action. Do not exercise the alpha
-helper's `install` operation against a daily-use ESP. Transaction rollback,
-restore/uninstall operations, and QEMU/OVMF integration tests remain required
-before hardware installation is offered.
+```bash
+systemctl --user is-active hyprpolkitagent.service
+```
+
+Launch the regular-user GUI:
+
+```bash
+./Installer/Linux/build/apex32-installer
+```
+
+Then:
+
+1. Press **Scan Now**.
+2. Approve the graphical PolicyKit dialog.
+3. Confirm that the expected operating-system EFI loaders appear.
+4. Confirm that `\EFI\APEX32\Apex32BootManager.efi` is not offered as an OS.
+5. Take a screenshot for the test report.
+6. Close the installer without pressing **Install**.
+
+The GUI stays unprivileged. PolicyKit starts the fixed helper only for the
+read-only `scan` request. The helper emits a bounded list of EFI loader paths;
+it does not write files or change NVRAM during this operation.
+
+## Troubleshooting
+
+### Terminal password prompt or `No session for cookie`
+
+The graphical PolicyKit agent is missing or inactive. Cancel the prompt and
+check:
+
+```bash
+systemctl --user --no-pager --full status hyprpolkitagent.service || true
+pgrep -af hyprpolkitagent || true
+```
+
+Do not keep retrying a terminal password prompt.
+
+### `pkexec` is missing
+
+Check with:
+
+```bash
+command -v pkexec
+```
+
+Install the distribution's PolicyKit/`pkexec` package before continuing.
+
+### ESP not detected
+
+Confirm that an ESP is mounted at a conventional location:
+
+```bash
+findmnt /boot/efi || findmnt /efi
+```
+
+The current firmware loads targets from the same ESP as APEX32. Multi-ESP
+discovery is a later release gate.
+
+## Cleanup
+
+After testing, close the GUI. The timestamped fresh clone may be moved to the
+desktop trash after its path is checked. Never remove or overwrite a personal
+APEX32 source tree.
+
+## Privileged installation phase
+
+Do not exercise the alpha helper's `install` operation against a daily-use ESP.
+Transactional rollback, GUI restore/uninstall, distribution packaging, and
+QEMU/OVMF destructive integration tests must pass before hardware installation
+is offered.

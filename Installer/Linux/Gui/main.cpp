@@ -229,7 +229,10 @@ void SortCandidates(QList<Candidate>* Results) {
   QProcess Process;
   Process.start(
       QStringLiteral("/usr/bin/pkexec"),
-      {Helper, QStringLiteral("scan"), EspRoot});
+      {QStringLiteral("--disable-internal-agent"),
+       Helper,
+       QStringLiteral("scan"),
+       EspRoot});
   if (!Process.waitForStarted(5000)) {
     *Error = QStringLiteral("could not start the graphical authorization prompt");
     return {};
@@ -243,8 +246,11 @@ void SortCandidates(QList<Candidate>* Results) {
   if ((Process.exitStatus() != QProcess::NormalExit) ||
       (Process.exitCode() != 0)) {
     *Error = QString::fromUtf8(Process.readAllStandardError()).trimmed();
-    if (Error->isEmpty()) {
-      *Error = QStringLiteral("authorization was cancelled or scanning failed");
+    if (Error->isEmpty() ||
+        Error->contains(QStringLiteral("not authorized"), Qt::CaseInsensitive) ||
+        Error->contains(QStringLiteral("no session for cookie"), Qt::CaseInsensitive)) {
+      *Error = QStringLiteral(
+          "graphical authorization was cancelled or no desktop PolicyKit agent is running");
     }
     return {};
   }
@@ -631,7 +637,8 @@ class InstallerWindow final : public QWidget {
     QProcess Process;
     Process.start(
         QStringLiteral("/usr/bin/pkexec"),
-        {Helper,
+        {QStringLiteral("--disable-internal-agent"),
+         Helper,
          QStringLiteral("install"),
          EspRoot_,
          Firmware,

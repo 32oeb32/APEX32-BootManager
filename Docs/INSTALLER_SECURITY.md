@@ -7,6 +7,9 @@ desktop GUI into a permanently privileged process.
 
 - The Qt GUI runs as the logged-in user and performs read-only discovery.
 - Installation invokes one fixed helper through polkit.
+- The GUI passes `--disable-internal-agent` to `pkexec`, so authentication may
+  use only the desktop's graphical PolicyKit agent and can never fall back to
+  a terminal password prompt.
 - The helper rejects non-root direct execution and validates the ESP mount,
   firmware source, and generated configuration before writing.
 - External programs are called with argument arrays through `QProcess`; no

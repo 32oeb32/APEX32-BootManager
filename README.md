@@ -43,6 +43,11 @@ disabled safe GUI demo without touching their boot configuration. See
 [Installer testing](Docs/INSTALLER_TESTING.md). These contributor commands are
 temporary; packaged beta users will launch the installer from their desktop.
 
+The installer guide includes a complete fresh-clone workflow, dependency
+setup, expected test output, Hyprland graphical authorization setup, a safe GUI
+demo, and an authorized read-only scan of the real ESP. It deliberately stops
+before installation on hardware.
+
 ## Build the firmware
 
 The repository directory must be named `APEX32-BootManager`. The pinned EDK II
