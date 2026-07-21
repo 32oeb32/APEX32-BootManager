@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+state="${APEX32_TRANSACTION_TEST_STATE:?}"
+order_file="${state}/order"
+entry_file="${state}/entry"
+create_count_file="${state}/create-count"
+fail_order_file="${state}/fail-next-bootorder"
+
+without_id() {
+  local order="$1"
+  local remove_id="${2^^}"
+  local result=""
+  local item
+  IFS=',' read -r -a items <<< "$order"
+  for item in "${items[@]}"; do
+    item="${item^^}"
+    if [[ -n "$item" && "$item" != "$remove_id" ]]; then
+      result="${result:+${result},}${item}"
+    fi
+  done
+  printf '%s\n' "$result"
+}
+
+show_state() {
+  printf 'BootCurrent: 0006\n'
+  printf 'Timeout: 0 seconds\n'
+  printf 'BootOrder: %s\n' "$(<"$order_file")"
+  printf 'Boot0006* Recovery Manager\tHD(1,GPT,stub)/\\EFI\\recovery\\bootx64.efi\n'
+  printf 'Boot0003* Existing OS\tHD(1,GPT,stub)/\\EFI\\existing\\bootx64.efi\n'
+  if [[ -f "$entry_file" ]]; then
+    printf 'Boot0007* APEX32 Secure Gateway\tHD(1,GPT,stub)/\\EFI\\APEX32\\Apex32BootManager.efi\n'
+  fi
+}
+
+if [[ "$#" -eq 0 ]]; then
+  show_state
+  exit 0
+fi
+
+if [[ "$1" == "-c" ]]; then
+  [[ "$#" -eq 9 ]]
+  [[ "$2" == "-d" && "$3" == "/dev/nvme0n1" ]]
+  [[ "$4" == "-p" && "$5" == "1" ]]
+  [[ "$6" == "-L" && "$7" == "APEX32 Secure Gateway" ]]
+  [[ "$8" == "-l" && "$9" == '\EFI\APEX32\Apex32BootManager.efi' ]]
+  count=0
+  [[ ! -f "$create_count_file" ]] || count="$(<"$create_count_file")"
+  printf '%s\n' "$((count + 1))" > "$create_count_file"
+  : > "$entry_file"
+  current="$(<"$order_file")"
+  printf '0007%s\n' "${current:+,${current}}" > "$order_file"
+  show_state
+  exit 0
+fi
+
+if [[ "$1" == "-o" ]]; then
+  [[ "$#" -eq 2 ]]
+  if [[ -f "$fail_order_file" ]]; then
+    rm "$fail_order_file"
+    printf 'injected boot-order failure\n' >&2
+    exit 9
+  fi
+  printf '%s\n' "$2" > "$order_file"
+  exit 0
+fi
+
+if [[ "$1" == "-b" ]]; then
+  [[ "$#" -eq 3 && "$3" == "-B" ]]
+  id="${2^^}"
+  [[ "$id" == "0007" ]]
+  rm -f "$entry_file"
+  without_id "$(<"$order_file")" "$id" > "${order_file}.new"
+  mv "${order_file}.new" "$order_file"
+  exit 0
+fi
+
+printf 'unexpected efibootmgr arguments: %s\n' "$*" >&2
+exit 2

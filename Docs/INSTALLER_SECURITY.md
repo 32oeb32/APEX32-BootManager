@@ -40,3 +40,18 @@ still required before beta.
 The GUI exposes a machine-readable `--capabilities` response. CI requires
 `SCAN|1`, `INSTALL|0`, and `TERMINAL_AUTH|0` for the public alpha. This makes an
 accidental build-mode regression visible before release.
+
+## Transaction test isolation
+
+CI builds `apex32-installer-transaction-test` separately from the installed
+helper. It is excluded from normal builds and never installed. Its mutating
+code runs only when `APEX32_TRANSACTION_TEST=1` is explicit, the requested ESP
+exactly matches `APEX32_TRANSACTION_TEST_ESP`, and that canonical path is below
+the system temporary directory. Tool calls are redirected to deterministic
+test stubs.
+
+The transaction test covers staged SHA-256 verification, current-file
+snapshots, immutable original backups, duplicate-free reinstall, post-install
+verification, and rollback after an injected boot-order failure. The public
+helper remains scan-only while this foundation is reviewed and extended with
+restore/uninstall and QEMU/OVMF coverage.

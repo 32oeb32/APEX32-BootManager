@@ -27,6 +27,19 @@ target_link_libraries(apex32-installer-helper PRIVATE Qt6::Core)
 target_compile_options(
   apex32-installer-helper PRIVATE -Wall -Wextra -Wpedantic)
 
+add_executable(
+  apex32-installer-transaction-test
+  EXCLUDE_FROM_ALL
+  PrivilegedHelper/main.cpp)
+target_link_libraries(apex32-installer-transaction-test PRIVATE Qt6::Core)
+target_compile_options(
+  apex32-installer-transaction-test PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_definitions(
+  apex32-installer-transaction-test
+  PRIVATE
+    APEX32_ENABLE_HARDWARE_INSTALL=1
+    APEX32_TRANSACTION_TEST=1)
+
 if(APEX32_ENABLE_HARDWARE_INSTALL)
   if(NOT APEX32_FIRMWARE OR NOT EXISTS "${APEX32_FIRMWARE}")
     message(

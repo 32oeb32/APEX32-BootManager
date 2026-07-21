@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+[[ "$#" -eq 3 ]]
+[[ "$1" == "-no" ]]
+case "$2" in
+  PKNAME)
+    printf 'nvme0n1\n'
+    ;;
+  PARTN)
+    printf '1\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac

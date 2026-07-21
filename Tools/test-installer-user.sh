@@ -55,6 +55,11 @@ cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   >/dev/null
 cmake --build "${build_dir}" --parallel >/dev/null
+cmake --build \
+  "${build_dir}" \
+  --target apex32-installer-transaction-test \
+  --parallel \
+  >/dev/null
 
 expected_capabilities=$'APEX32CAPS|1\nSCAN|1\nINSTALL|0\nTERMINAL_AUTH|0'
 actual_capabilities="$("${build_dir}/apex32-installer" --capabilities)"
@@ -65,6 +70,8 @@ if [[ "${actual_capabilities}" != "${expected_capabilities}" ]]; then
 fi
 
 "${build_dir}/apex32-installer" --self-test "${esp}"
+"${repo_root}/Tests/InstallerTransactionTest.sh" \
+  "${build_dir}/apex32-installer-transaction-test"
 
 set +e
 helper_error="$(

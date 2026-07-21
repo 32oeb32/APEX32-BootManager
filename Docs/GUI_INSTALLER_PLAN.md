@@ -48,3 +48,12 @@ will not be reused as a shortcut.
 - CI assertion that release artifacts contain the intended capability mode.
 
 Until all gates pass, the public build must continue to report `INSTALL|0`.
+
+### Implemented beta foundation
+
+The source tree now contains a CI-only transaction helper that tests staged
+copying, SHA-256 verification, immutable backups, reinstall without duplicate
+entries, and automatic rollback after simulated firmware failure. It is not
+installed and cannot target the real ESP. Remaining gates are persistent
+install-state metadata, GUI Restore/Uninstall, QEMU/OVMF boot verification,
+package signing, and hardware qualification.

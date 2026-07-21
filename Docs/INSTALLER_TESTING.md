@@ -86,6 +86,9 @@ PASS: 67 frames, 7 keys, dynamic config and manual boot paths clean
 PASS: UEFI entry lifecycle, verbose parsing, duplicate guard, and rollback
 PASS: fallback install, immutable backup, status, and restore
 PASS: regular-user discovery found 5 systems, preferred shim, excluded APEX32, kept fallback as unselected recovery, parsed authorized scan, and generated schema 1
+PASS: transactional install, idempotent reinstall, and immutable backup
+PASS: injected boot-order failures restored files, order, and new entry
+PASS: transaction test binary was confined to its declared temporary ESP
 PASS: helper enforced scan-only install gate and refused unprivileged scan
 PASS: hardware-install opt-in required firmware and the mock ESP was unchanged
 PASS: regular-user installer test completed without sudo or terminal authentication
@@ -95,6 +98,13 @@ The installer test creates a temporary mock ESP, detects Windows, Kali, Ubuntu,
 a generic EFI tool, and the UEFI fallback loader, then deletes the temporary
 directory. The fallback is shown as recovery and is unchecked by default. The
 test never invokes PolicyKit and never touches the real ESP.
+
+The same script builds a separate, non-installed transaction-test helper. That
+binary is compile-time restricted to one explicitly declared temporary ESP
+under `/tmp`. It exercises installation and reinstall, then injects a simulated
+firmware boot-order failure and verifies automatic restoration of files, boot
+order, and any newly created APEX32 entry. The normal public helper remains
+compiled with `INSTALL|0`.
 
 ## 4. Inspect the safe GUI demo
 
