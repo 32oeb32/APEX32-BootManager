@@ -41,14 +41,23 @@ for maintainer_script in preinst postinst prerm postrm; do
   fi
 done
 
-if mountpoint -q /boot/efi 2>/dev/null; then
-  echo "FAIL: lifecycle test refuses a host with a mounted /boot/efi" >&2
-  exit 3
-fi
 if [[ -e /boot/efi/EFI/APEX32 ]]; then
   echo "FAIL: lifecycle test refuses a host containing /boot/efi/EFI/APEX32" >&2
   exit 3
 fi
+
+snapshot_esp() {
+  local esp_path=/boot/efi
+
+  if mountpoint -q "${esp_path}" 2>/dev/null; then
+    {
+      sudo find "${esp_path}" -xdev \
+        -printf 'META|%y|%m|%U|%G|%s|%p|%l\n'
+      sudo find "${esp_path}" -xdev -type f \
+        -exec sha256sum {} +
+    } | LC_ALL=C sort
+  fi
+}
 
 snapshot_efivars() {
   local efivar_path=/sys/firmware/efi/efivars
@@ -59,6 +68,7 @@ snapshot_efivars() {
   fi
 }
 
+esp_snapshot_before="$(snapshot_esp)"
 efivar_snapshot_before="$(snapshot_efivars)"
 
 cleanup() {
@@ -122,6 +132,12 @@ for path in \
 done
 [[ ! -e /boot/efi/EFI/APEX32 ]]
 
+esp_snapshot_after="$(snapshot_esp)"
+if [[ "${esp_snapshot_after}" != "${esp_snapshot_before}" ]]; then
+  echo "FAIL: EFI System Partition changed during package lifecycle testing" >&2
+  exit 6
+fi
+
 efivar_snapshot_after="$(snapshot_efivars)"
 if [[ "${efivar_snapshot_after}" != "${efivar_snapshot_before}" ]]; then
   echo "FAIL: EFI variables changed during package lifecycle testing" >&2
@@ -133,4 +149,4 @@ trap - EXIT
 echo "PASS: disposable runner installed the Debian package with protected ownership and complete desktop metadata"
 echo "PASS: package reinstall preserved the verified firmware and install/restore capability mode"
 echo "PASS: package has no maintainer scripts and purge removed every packaged path"
-echo "PASS: package lifecycle left the ESP and EFI-variable snapshot unchanged"
+echo "PASS: package lifecycle left the complete ESP and EFI-variable snapshots unchanged"

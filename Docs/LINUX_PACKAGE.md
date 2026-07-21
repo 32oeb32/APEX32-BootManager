@@ -63,10 +63,10 @@ temporary directory and verifies:
 The GitHub package workflow then installs the package on a disposable runner,
 checks root ownership and capability mode, reinstalls it, purges it, and
 confirms every packaged path was removed. The lifecycle script refuses to run
-outside GitHub Actions, on a mounted `/boot/efi`, or where an APEX32 ESP path
-already exists. It rejects packages containing Debian maintainer scripts and,
-when the hosted runner exposes EFI variables, snapshots every variable before
-and after the lifecycle so any mutation fails the gate.
+outside GitHub Actions or where an APEX32 ESP path already exists. It rejects
+packages containing Debian maintainer scripts. When the hosted runner exposes
+an ESP or EFI variables, the test snapshots all paths, metadata, and file
+content before and after the lifecycle so any mutation fails the gate.
 
 The candidate remains unreleased until the hardware, multi-ESP, Secure Boot,
 recovery-media, and release-signing gates in
