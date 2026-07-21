@@ -1,0 +1,89 @@
+name: windows-package
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-preview:
+    # Qt uses the MSVC 2022 ABI, so keep the runner toolchain identical.
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Qt and NSIS build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check aqtinstall
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 `
+            --outputdir "$env:RUNNER_TEMP/Qt"
+          choco install nsis --yes --no-progress
+
+      - name: Build the graphical Windows preview
+        shell: pwsh
+        run: |
+          $qt = "$env:RUNNER_TEMP/Qt/6.8.3/msvc2022_64"
+          cmake `
+            -S Installer/Windows `
+            -B Installer/Windows/build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_PREFIX_PATH="$qt"
+          cmake --build Installer/Windows/build --config Release --parallel
+          cmake `
+            --install Installer/Windows/build `
+            --config Release `
+            --prefix Installer/Windows/build/stage
+
+      - name: Verify fail-closed capabilities
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $probe = Start-Process `
+            -FilePath Installer/Windows/build/stage/bin/apex32-installer.exe `
+            -ArgumentList @(
+              "--capabilities-file",
+              "Installer/Windows/build/capabilities.txt"
+            ) `
+            -Wait `
+            -PassThru
+          if ($probe.ExitCode -ne 0) {
+            throw "Windows capability probe failed"
+          }
+          $actual = Get-Content Installer/Windows/build/capabilities.txt
+          $expected = @(
+            "APEX32CAPS|1",
+            "SCAN|1",
+            "INSTALL|0",
+            "RESTORE|0",
+            "UAC|1"
+          )
+          if (Compare-Object $expected $actual) {
+            throw "Unexpected Windows capability mode"
+          }
+
+      - name: Build the one-launch setup executable
+        shell: pwsh
+        run: |
+          $env:PATH = "C:/Program Files (x86)/NSIS;$env:PATH"
+          cpack `
+            --config Installer/Windows/build/CPackConfig.cmake `
+            -C Release `
+            -B Installer/Windows/build/package
+          $setups = @(
+            Get-ChildItem Installer/Windows/build/package `
+              -Filter "APEX32-Community-Setup*.exe"
+          )
+          if ($setups.Count -ne 1) {
+            throw "Expected one Windows setup executable"
+          }
+
+      - name: Publish the Windows preview artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: APEX32-Community-Windows-Preview
+          path: Installer/Windows/build/package/APEX32-Community-Setup*.exe
+          if-no-files-found: error

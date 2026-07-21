@@ -6,8 +6,18 @@ contributor workflows; release users do not need a terminal.
 
 ## Release-user experience
 
-1. Download `apex32-boot-manager_0.11.0~beta1_amd64.deb` from the official
-   GitHub release linked by [apex32-secure.com](https://apex32-secure.com).
+Technical users may clone and launch the verified package flow with one
+command:
+
+```bash
+git clone https://github.com/32oeb32/APEX32-BootManager.git && cd APEX32-BootManager && ./install.sh
+```
+
+Desktop-only users can instead download
+`apex32-boot-manager_amd64.deb` from the official GitHub release linked by
+[apex32-secure.com](https://apex32-secure.com).
+
+1. Download `apex32-boot-manager_amd64.deb` or run the one-command launcher.
 2. Double-click the downloaded package and choose **Install** in the desktop
    software application. The package includes AppStream metadata, a desktop
    launcher, and a scalable APEX32 icon.
@@ -23,6 +33,11 @@ contributor workflows; release users do not need a terminal.
 
 No terminal, manual ESP selection, file copying, `efibootmgr`, GRUB editing, or
 rEFInd is part of the release-user workflow.
+
+The launcher requires the release's matching `.sha256` asset and refuses to
+install when it is missing or invalid. It uses `pkexec --disable-internal-agent`
+so administrator approval is graphical and cannot fall back to a terminal
+password prompt.
 
 ## Recovery and removal
 
@@ -57,8 +72,9 @@ temporary directory and verifies:
 - the firmware matches the verified EDK II output byte-for-byte;
 - only the package build reports `INSTALL|1` and `RESTORE|1`;
 - terminal authentication remains disabled; and
-- runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` in
-  addition to automatically detected shared-library dependencies.
+- runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` together
+  with portable Qt dependency alternatives for Ubuntu, Debian, and Kali
+  package naming.
 
 The GitHub package workflow then installs the package on a disposable runner,
 checks root ownership and capability mode, reinstalls it, purges it, and
@@ -67,6 +83,11 @@ outside GitHub Actions or where an APEX32 ESP path already exists. It rejects
 packages containing Debian maintainer scripts. When the hosted runner exposes
 an ESP or EFI variables, the test snapshots all paths, metadata, and file
 content before and after the lifecycle so any mutation fails the gate.
+
+The same workflow then installs the identical Ubuntu-built `.deb` inside an
+official Kali rolling container and launches its packaged capability probe.
+This keeps one Debian-family artifact while preventing build-host-specific Qt
+package names from reaching users again.
 
 The candidate remains unreleased until the hardware, multi-ESP, Secure Boot,
 recovery-media, and release-signing gates in

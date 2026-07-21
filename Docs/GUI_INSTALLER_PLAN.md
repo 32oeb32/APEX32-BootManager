@@ -12,7 +12,8 @@ Cloning, compiling, and terminal commands are contributor workflows only.
   helper.
 - The CI-built Debian beta package is the only build mode that embeds verified
   firmware and enables `INSTALL|1` and `RESTORE|1`.
-- No Windows installer is published yet.
+- A one-launch Windows NSIS scan-preview package is built in CI. It reports
+  `INSTALL|0` and `RESTORE|0` until the native transaction is qualified.
 
 ## Linux beta experience
 
@@ -38,6 +39,10 @@ Cloning, compiling, and terminal commands are contributor workflows only.
 
 Windows support requires a native backend; the Linux helper and PolicyKit code
 will not be reused as a shortcut.
+
+The implemented preview already covers steps 1–4 with one setup executable,
+standard UAC elevation for read-only ESP discovery, automatic temporary ESP
+mounting, and automatic unmounting. Steps 5–6 remain fail-closed release gates.
 
 ## Release gates
 

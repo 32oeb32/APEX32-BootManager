@@ -41,3 +41,5 @@ rm -f "${TEST_BINARY}"
 "${PROJECT_ROOT}/Tests/UefiEntryManagerTest.sh"
 "${PROJECT_ROOT}/Tests/FallbackManagerTest.sh"
 python3 "${PROJECT_ROOT}/Tests/QemuOvmfVisualTest.py" --self-test
+"${PROJECT_ROOT}/Tests/OneStepInstallTest.sh"
+"${PROJECT_ROOT}/Tests/WindowsPackageStaticTest.sh"
