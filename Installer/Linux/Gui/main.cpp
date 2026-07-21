@@ -398,7 +398,7 @@ void SortCandidates(QList<Candidate>* Results) {
           Candidates,
           QStringLiteral("UEFI FALLBACK (RECOVERY)"),
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
-          QStringLiteral("generic")) &&
+          QStringLiteral("recovery")) &&
       HasDefaultSelection(
           Candidates,
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
@@ -437,6 +437,11 @@ void SortCandidates(QList<Candidate>* Results) {
           QStringLiteral("UBUNTU"),
           QStringLiteral("\\EFI\\ubuntu\\shimx64.efi"),
           QStringLiteral("ubuntu")) ||
+      !HasCandidate(
+          AuthorizedCandidates,
+          QStringLiteral("UEFI FALLBACK (RECOVERY)"),
+          QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
+          QStringLiteral("recovery")) ||
       !HasDefaultSelection(
           AuthorizedCandidates,
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
