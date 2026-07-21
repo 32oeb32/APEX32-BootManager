@@ -39,15 +39,33 @@ firmware_state() {
 }
 
 boot_order() {
-  firmware_state | awk -F': ' '/^BootOrder:/ {gsub(/[[:space:]]/, "", $2); print toupper($2); exit}'
+  firmware_state | awk -F': ' '
+    !found && /^BootOrder:/ {
+      gsub(/[[:space:]]/, "", $2)
+      print toupper($2)
+      found = 1
+    }
+  '
 }
 
 boot_next() {
-  firmware_state | awk -F': ' '/^BootNext:/ {gsub(/[[:space:]]/, "", $2); print toupper($2); exit}'
+  firmware_state | awk -F': ' '
+    !found && /^BootNext:/ {
+      gsub(/[[:space:]]/, "", $2)
+      print toupper($2)
+      found = 1
+    }
+  '
 }
 
 boot_current() {
-  firmware_state | awk -F': ' '/^BootCurrent:/ {gsub(/[[:space:]]/, "", $2); print toupper($2); exit}'
+  firmware_state | awk -F': ' '
+    !found && /^BootCurrent:/ {
+      gsub(/[[:space:]]/, "", $2)
+      print toupper($2)
+      found = 1
+    }
+  '
 }
 
 entry_ids() {
@@ -73,11 +91,11 @@ entry_id() {
 
 refind_id() {
   firmware_state | awk '
-    /^Boot[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/ {
+    !found && /^Boot[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/ {
       name = tolower($0)
       if (name ~ /refind/) {
         print toupper(substr($1, 5, 4))
-        exit
+        found = 1
       }
     }
   '
