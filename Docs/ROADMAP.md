@@ -33,8 +33,10 @@ Current beta foundation gates:
   to first in `BootOrder`, cold reboot, and require the APEX32 framebuffer;
 - completed: navigate Linux and Windows cards and transfer control through
   real UEFI `LoadImage()` / `StartImage()` to isolated signature payloads;
-- next: exercise representative GRUB, shim, systemd-boot, and Windows recovery
-  images; and
+- automated gate: launch a real standalone GRUB image both directly and
+  through the distribution's packaged shim, then require GRUB to chainload the
+  isolated signature payload;
+- next: exercise systemd-boot and a user-supplied Windows recovery image; and
 - next: package, install, update, restore, and uninstall entirely through the
   desktop GUI.
 

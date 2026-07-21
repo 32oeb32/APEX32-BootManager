@@ -19,11 +19,13 @@ jobs:
           sudo apt-get install --yes \
             build-essential \
             git \
+            grub-efi-amd64-bin \
             iasl \
             nasm \
             ovmf \
             python3 \
             qemu-system-x86 \
+            shim-signed \
             uuid-dev
 
       - name: Check out the pinned EDK II revision
@@ -56,6 +58,11 @@ jobs:
         env:
           APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-handoff.ppm
         run: ./Tools/test-qemu-ovmf-handoff.sh
+
+      - name: Launch real GRUB and shim through APEX32
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-real-linux.ppm
+        run: ./Tools/test-qemu-ovmf-linux-loaders.sh
 
       - name: Preserve the framebuffer when the gate fails
         if: failure()

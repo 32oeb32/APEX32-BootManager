@@ -32,6 +32,7 @@ After building `Apex32BootManager.efi`, run:
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
 ./Tools/test-qemu-ovmf-handoff.sh
+./Tools/test-qemu-ovmf-linux-loaders.sh
 ```
 
 This boots the real EFI application under QEMU/OVMF and validates a captured
@@ -42,3 +43,9 @@ APEX32 menu and requires successful `LoadImage()` / `StartImage()` transfer to
 test-only Linux-path and Windows-path UEFI child applications. All commands use
 only a temporary virtual ESP and private OVMF variable store. See
 [QEMU/OVMF firmware testing](../Docs/QEMU_OVMF_TESTING.md).
+
+The fourth command adds real Linux loader coverage. It builds a standalone GRUB
+EFI image from the locally installed distribution package, first launches GRUB
+directly through APEX32, then launches the packaged shim which in turn starts
+GRUB. Both paths must chainload the isolated framebuffer-signature payload.
+Neither GRUB nor shim is stored in this repository.

@@ -8,6 +8,8 @@ FIRMWARE="${APEX32_FIRMWARE:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/Apex32BootManag
 SEEDER="${APEX32_OVMF_SEEDER:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfBootOrderSeeder.efi}"
 LINUX_HANDOFF="${APEX32_OVMF_LINUX_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfLinuxHandoffTarget.efi}"
 WINDOWS_HANDOFF="${APEX32_OVMF_WINDOWS_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfWindowsHandoffTarget.efi}"
+LINUX_LOADER_PATH="${APEX32_OVMF_LINUX_LOADER_PATH:-EFI/kali/grubx64.efi}"
+ESP_OVERLAY="${APEX32_OVMF_ESP_OVERLAY:-}"
 TEST_MODE="${APEX32_OVMF_TEST_MODE:-fallback}"
 
 find_ovmf_pair() {
@@ -52,6 +54,16 @@ command -v python3 >/dev/null || {
   echo "error: build it with Tools/build-edk2.sh first" >&2
   exit 2
 }
+case "/${LINUX_LOADER_PATH}/" in
+  *"/../"*|*"/./"*|"//"*)
+    echo "error: APEX32_OVMF_LINUX_LOADER_PATH must be a relative ESP path" >&2
+    exit 2
+    ;;
+esac
+if [[ -n "${ESP_OVERLAY}" && ! -d "${ESP_OVERLAY}" ]]; then
+  echo "error: APEX32_OVMF_ESP_OVERLAY is not a directory: ${ESP_OVERLAY}" >&2
+  exit 2
+fi
 
 LINUX_LOADER_SOURCE=/dev/null
 WINDOWS_LOADER_SOURCE=/dev/null
@@ -142,12 +154,15 @@ mkdir -p \
 install -m 0644 "${FALLBACK_LOADER}" "${ESP_ROOT}/EFI/BOOT/BOOTX64.EFI"
 install -m 0644 "${FIRMWARE}" "${ESP_ROOT}/EFI/APEX32/Apex32BootManager.efi"
 install -m 0644 /dev/null "${ESP_ROOT}/EFI/BlackArch_Linux/grubx64.efi"
-install -m 0644 "${LINUX_LOADER_SOURCE}" "${ESP_ROOT}/EFI/kali/grubx64.efi"
+install -Dm 0644 "${LINUX_LOADER_SOURCE}" "${ESP_ROOT}/${LINUX_LOADER_PATH}"
 install -m 0644 "${WINDOWS_LOADER_SOURCE}" "${ESP_ROOT}/EFI/Microsoft/Boot/bootmgfw.efi"
 install -m 0644 "${OVMF_VARS_PATH}" "${SANDBOX}/OVMF_VARS.fd"
 install -m 0644 \
   "${PROJECT_ROOT}/Config/apex32.cfg.example" \
   "${ESP_ROOT}/EFI/APEX32/apex32.cfg"
+if [[ -n "${ESP_OVERLAY}" ]]; then
+  cp -a "${ESP_OVERLAY}/." "${ESP_ROOT}/"
+fi
 
 "${QEMU_BIN}" \
   -machine q35,accel=tcg \
