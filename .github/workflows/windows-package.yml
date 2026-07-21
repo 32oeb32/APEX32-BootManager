@@ -71,8 +71,12 @@ jobs:
           $env:PATH = "C:/Program Files (x86)/NSIS;$env:PATH"
           cpack `
             --config Installer/Windows/build/CPackConfig.cmake `
-            -C Release
-          $setups = @(Get-ChildItem Installer/Windows/build -Filter "APEX32-Community-Setup*.exe")
+            -C Release `
+            -B Installer/Windows/build/package
+          $setups = @(
+            Get-ChildItem Installer/Windows/build/package `
+              -Filter "APEX32-Community-Setup*.exe"
+          )
           if ($setups.Count -ne 1) {
             throw "Expected one Windows setup executable"
           }
@@ -81,5 +85,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: APEX32-Community-Windows-Preview
-          path: Installer/Windows/build/APEX32-Community-Setup*.exe
+          path: Installer/Windows/build/package/APEX32-Community-Setup*.exe
           if-no-files-found: error

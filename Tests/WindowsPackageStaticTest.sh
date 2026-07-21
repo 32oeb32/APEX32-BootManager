@@ -19,6 +19,10 @@ done
 
 grep -q 'CPACK_GENERATOR "NSIS"' "${windows_root}/CMakeLists.txt"
 grep -q 'APEX32-Community-Setup' "${windows_root}/CMakeLists.txt"
+grep -q 'CPACK_NSIS_MUI_FINISHPAGE_RUN "bin/apex32-installer.exe"' \
+  "${windows_root}/CMakeLists.txt"
+grep -q -- '-B Installer/Windows/build/package' \
+  "${project_root}/.github/workflows/windows-package.yml"
 grep -q 'requestedExecutionLevel level="asInvoker"' \
   "${windows_root}/apex32-installer.manifest"
 grep -q 'ShellExecuteW' "${windows_root}/Gui/main.cpp"

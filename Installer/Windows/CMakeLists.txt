@@ -80,7 +80,7 @@ set(CPACK_PACKAGE_FILE_NAME "APEX32-Community-Setup")
 set(CPACK_NSIS_DISPLAY_NAME "APEX32 Community Installer")
 set(CPACK_NSIS_PACKAGE_NAME "APEX32 Community Installer")
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-set(CPACK_NSIS_MUI_FINISHPAGE_RUN "bin\\apex32-installer.exe")
+set(CPACK_NSIS_MUI_FINISHPAGE_RUN "bin/apex32-installer.exe")
 set(CPACK_NSIS_MENU_LINKS
     "bin/apex32-installer.exe" "APEX32 Community Installer")
 include(CPack)
