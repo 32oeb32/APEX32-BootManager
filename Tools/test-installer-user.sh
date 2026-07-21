@@ -27,11 +27,12 @@ trap 'rm -rf "${sandbox}"' EXIT
 
 esp="${sandbox}/mock-esp"
 build_dir="${sandbox}/build"
-firmware="${sandbox}/Apex32BootManager.efi"
+hardware_build_dir="${sandbox}/hardware-build"
 
 mkdir -p \
   "${esp}/EFI/APEX32" \
   "${esp}/EFI/Microsoft/Boot" \
+  "${esp}/EFI/BOOT" \
   "${esp}/EFI/kali" \
   "${esp}/EFI/ubuntu" \
   "${esp}/EFI/tools"
@@ -39,11 +40,11 @@ mkdir -p \
 touch \
   "${esp}/EFI/APEX32/Apex32BootManager.efi" \
   "${esp}/EFI/Microsoft/Boot/bootmgfw.efi" \
+  "${esp}/EFI/BOOT/BOOTX64.EFI" \
   "${esp}/EFI/kali/grubx64.efi" \
   "${esp}/EFI/ubuntu/grubx64.efi" \
   "${esp}/EFI/ubuntu/shimx64.efi" \
-  "${esp}/EFI/tools/shellx64.efi" \
-  "${firmware}"
+  "${esp}/EFI/tools/shellx64.efi"
 
 before="$(find "${esp}" -type f -printf '%P\n' | LC_ALL=C sort)"
 
@@ -52,22 +53,46 @@ cmake \
   -B "${build_dir}" \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DAPEX32_FIRMWARE="${firmware}" \
   >/dev/null
 cmake --build "${build_dir}" --parallel >/dev/null
+
+expected_capabilities=$'APEX32CAPS|1\nSCAN|1\nINSTALL|0\nTERMINAL_AUTH|0'
+actual_capabilities="$("${build_dir}/apex32-installer" --capabilities)"
+if [[ "${actual_capabilities}" != "${expected_capabilities}" ]]; then
+  echo "FAIL: source build did not report the scan-only capability gate" >&2
+  printf '%s\n' "${actual_capabilities}" >&2
+  exit 3
+fi
 
 "${build_dir}/apex32-installer" --self-test "${esp}"
 
 set +e
 helper_error="$(
   "${build_dir}/apex32-installer-helper" \
-    install "${esp}" "${firmware}" "${firmware}" 2>&1
+    install "${esp}" "${esp}/missing-firmware" "${esp}/missing-config" 2>&1
 )"
 helper_result=$?
 set -e
 if [[ ${helper_result} -eq 0 ]] ||
-   [[ "${helper_error}" != *"graphical authorization prompt"* ]]; then
-  echo "FAIL: privileged helper did not reject an unprivileged direct call" >&2
+   [[ "${helper_error}" != *"hardware installation is disabled in this scan-only build"* ]]; then
+  echo "FAIL: helper did not enforce the compiled scan-only gate" >&2
+  exit 3
+fi
+
+set +e
+hardware_configure_error="$(
+  cmake \
+    -S "${repo_root}/Installer/Linux" \
+    -B "${hardware_build_dir}" \
+    -G Ninja \
+    -DAPEX32_ENABLE_HARDWARE_INSTALL=ON \
+    2>&1
+)"
+hardware_configure_result=$?
+set -e
+if [[ ${hardware_configure_result} -eq 0 ]] ||
+   [[ "${hardware_configure_error}" != *"requires an existing APEX32_FIRMWARE file"* ]]; then
+  echo "FAIL: hardware-install build did not require a packaged firmware file" >&2
   exit 3
 fi
 
@@ -89,5 +114,6 @@ if [[ "${before}" != "${after}" ]]; then
   exit 4
 fi
 
-echo "PASS: helper refused unprivileged scan/install and the mock ESP was unchanged"
-echo "PASS: regular-user installer test completed without sudo"
+echo "PASS: helper enforced scan-only install gate and refused unprivileged scan"
+echo "PASS: hardware-install opt-in required firmware and the mock ESP was unchanged"
+echo "PASS: regular-user installer test completed without sudo or terminal authentication"

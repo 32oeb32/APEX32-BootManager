@@ -6,7 +6,12 @@ desktop GUI into a permanently privileged process.
 ## Rules
 
 - The Qt GUI runs as the logged-in user and performs read-only discovery.
-- Installation invokes one fixed helper through polkit.
+- Default source builds define `APEX32_ENABLE_HARDWARE_INSTALL=OFF`. The GUI
+  disables installation and the helper compiles out every mutating function.
+- A direct `install` helper request is rejected before privilege or file checks.
+- A future hardware-tested package may opt in at build time and must bundle an
+  existing, verified firmware artifact; CMake otherwise fails configuration.
+- Installation in such a future package invokes one fixed helper through polkit.
 - The GUI passes `--disable-internal-agent` to `pkexec`, so authentication may
   use only the desktop's graphical PolicyKit agent and can never fall back to
   a terminal password prompt.
@@ -17,8 +22,9 @@ desktop GUI into a permanently privileged process.
 - The first existing APEX32 firmware file is preserved before replacement.
 - A stable release must add GUI-tested restore and uninstall operations.
 
-The alpha helper currently depends on `findmnt`, `lsblk`, and `efibootmgr` at
-fixed `/usr/bin` paths. Packaging must declare and verify these dependencies.
+The experimental, default-off install implementation depends on `findmnt`,
+`lsblk`, and `efibootmgr` at fixed `/usr/bin` paths. Packaging must declare and
+verify these dependencies before enabling it.
 
 The GUI also provides an explicit regular-user test mode backed by a temporary
 mock ESP. Test mode disables installation and never invokes the helper. See
@@ -30,3 +36,7 @@ invoke the same narrowly scoped helper through a graphical authorization
 prompt with the `scan` operation. That operation emits only bounded EFI loader
 paths and cannot write files or firmware variables. Multi-ESP enumeration is
 still required before beta.
+
+The GUI exposes a machine-readable `--capabilities` response. CI requires
+`SCAN|1`, `INSTALL|0`, and `TERMINAL_AUTH|0` for the public alpha. This makes an
+accidental build-mode regression visible before release.

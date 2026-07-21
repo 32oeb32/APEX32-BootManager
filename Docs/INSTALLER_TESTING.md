@@ -5,15 +5,15 @@ a repository and running build commands. The eventual packaged APEX32 installer
 must remain a desktop application that does not ask end users to type commands.
 
 The tests are deliberately split into safe mock-ESP testing and an authorized,
-read-only scan of the real EFI System Partition (ESP). The alpha helper's
-`install` operation is not approved for daily-use hardware yet.
+read-only scan of the real EFI System Partition (ESP). The default alpha build
+compiles the hardware-install operation out of both the GUI and helper.
 
 ## Safety rules
 
 - Use a fresh clone, separate from any personal APEX32 development tree.
 - Run the GUI and all test scripts as the normal desktop user, never with
   `sudo`.
-- Do not press **Install** during the authorized-scan test.
+- Confirm that **Hardware Installation Disabled in Alpha** is disabled.
 - Do not copy files to the ESP or change UEFI variables as part of this guide.
 - Stop if a password prompt appears inside the terminal. Authentication must be
   handled by the desktop's graphical PolicyKit agent.
@@ -85,27 +85,32 @@ Expected final lines include:
 PASS: 67 frames, 7 keys, dynamic config and manual boot paths clean
 PASS: UEFI entry lifecycle, verbose parsing, duplicate guard, and rollback
 PASS: fallback install, immutable backup, status, and restore
-PASS: regular-user discovery found 4 systems, preferred shim, excluded APEX32, parsed authorized scan, and generated schema 1
-PASS: helper refused unprivileged scan/install and the mock ESP was unchanged
-PASS: regular-user installer test completed without sudo
+PASS: regular-user discovery found 5 systems, preferred shim, excluded APEX32, kept fallback as unselected recovery, parsed authorized scan, and generated schema 1
+PASS: helper enforced scan-only install gate and refused unprivileged scan
+PASS: hardware-install opt-in required firmware and the mock ESP was unchanged
+PASS: regular-user installer test completed without sudo or terminal authentication
 ```
 
 The installer test creates a temporary mock ESP, detects Windows, Kali, Ubuntu,
-and a generic EFI tool, then deletes the temporary directory. It never invokes
-PolicyKit and never touches the real ESP.
+a generic EFI tool, and the UEFI fallback loader, then deletes the temporary
+directory. The fallback is shown as recovery and is unchecked by default. The
+test never invokes PolicyKit and never touches the real ESP.
 
 ## 4. Inspect the safe GUI demo
 
-Build the two installer binaries as the normal user:
+Build the two scan-only installer binaries as the normal user:
 
 ```bash
-cmake \
-  -S Installer/Linux \
-  -B Installer/Linux/build \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release
+./Tools/build-installer.sh
+```
 
-cmake --build Installer/Linux/build --parallel
+The final capability output must be:
+
+```text
+APEX32CAPS|1
+SCAN|1
+INSTALL|0
+TERMINAL_AUTH|0
 ```
 
 Launch the mock-ESP demo:
@@ -114,8 +119,9 @@ Launch the mock-ESP demo:
 ./Tools/run-installer-demo.sh
 ```
 
-The window must show a cyan safe-test banner, mock operating systems, and a
-disabled **Install** button. Close the window after inspection.
+The window must show a cyan safe-test banner, mock operating systems, an
+unchecked **UEFI FALLBACK (RECOVERY)** row, and a disabled hardware-install
+button. Close the window after inspection.
 
 ## 5. Perform the authorized read-only ESP scan
 
@@ -137,8 +143,9 @@ Then:
 2. Approve the graphical PolicyKit dialog.
 3. Confirm that the expected operating-system EFI loaders appear.
 4. Confirm that `\EFI\APEX32\Apex32BootManager.efi` is not offered as an OS.
-5. Take a screenshot for the test report.
-6. Close the installer without pressing **Install**.
+5. Confirm the generic fallback is marked recovery and unchecked.
+6. Open **Install** and confirm hardware installation is disabled.
+7. Take a screenshot for the test report, then close the installer.
 
 The GUI stays unprivileged. PolicyKit starts the fixed helper only for the
 read-only `scan` request. The helper emits a bounded list of EFI loader paths;
@@ -187,7 +194,17 @@ APEX32 source tree.
 
 ## Privileged installation phase
 
-Do not exercise the alpha helper's `install` operation against a daily-use ESP.
-Transactional rollback, GUI restore/uninstall, distribution packaging, and
+The default source build rejects the alpha helper's `install` operation even
+when invoked directly. Do not bypass the compile-time gate. Transactional
+rollback, GUI restore/uninstall, distribution packaging, signed artifacts, and
 QEMU/OVMF destructive integration tests must pass before hardware installation
-is offered.
+is offered in an end-user package.
+
+## End-user packages and Windows
+
+These commands are contributor tests, not the intended customer experience.
+The Linux beta will be launched from a desktop icon and will use only the
+desktop PolicyKit dialog. The planned Windows beta will be a signed MSI or EXE
+that uses the standard UAC consent dialog. Neither packaged flow will require a
+terminal. Current Windows users should not attempt to install this alpha from
+source; a Windows installer has not been released.

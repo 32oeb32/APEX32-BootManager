@@ -22,12 +22,20 @@
 
 #include <algorithm>
 
+#ifndef APEX32_ENABLE_HARDWARE_INSTALL
+#define APEX32_ENABLE_HARDWARE_INSTALL 0
+#endif
+
 namespace {
+
+constexpr bool kHardwareInstallEnabled =
+    APEX32_ENABLE_HARDWARE_INSTALL != 0;
 
 struct Candidate final {
   QString Name;
   QString LoaderPath;
   QString Icon;
+  bool DefaultSelected = true;
 };
 
 [[nodiscard]] QString DetectEspRoot() {
@@ -59,7 +67,10 @@ struct Candidate final {
   Result.LoaderPath = QStringLiteral("\\") + Relative;
   Result.Icon = QStringLiteral("generic");
 
-  if (Lower.contains(QStringLiteral("microsoft\\boot\\bootmgfw.efi"))) {
+  if (Lower == QStringLiteral("efi\\boot\\bootx64.efi")) {
+    Result.Name = QStringLiteral("UEFI FALLBACK (RECOVERY)");
+    Result.DefaultSelected = false;
+  } else if (Lower.contains(QStringLiteral("microsoft\\boot\\bootmgfw.efi"))) {
     Result.Name = QStringLiteral("WINDOWS BOOT MANAGER");
     Result.Icon = QStringLiteral("windows");
   } else if (Lower.contains(QStringLiteral("\\kali\\"))) {
@@ -294,6 +305,29 @@ void SortCandidates(QList<Candidate>* Results) {
       });
 }
 
+[[nodiscard]] bool HasDefaultSelection(
+    const QList<Candidate>& Candidates,
+    const QString& LoaderSuffix,
+    const bool Expected) {
+  const auto Match = std::find_if(
+      Candidates.cbegin(),
+      Candidates.cend(),
+      [&LoaderSuffix](const Candidate& Entry) {
+        return Entry.LoaderPath.endsWith(
+            LoaderSuffix, Qt::CaseInsensitive);
+      });
+  return Match != Candidates.cend() && Match->DefaultSelected == Expected;
+}
+
+[[nodiscard]] int PrintCapabilities() {
+  QTextStream Output(stdout);
+  Output << "APEX32CAPS|1\n"
+         << "SCAN|1\n"
+         << "INSTALL|" << (kHardwareInstallEnabled ? 1 : 0) << '\n'
+         << "TERMINAL_AUTH|0\n";
+  return 0;
+}
+
 [[nodiscard]] int RunInstallerSelfTest(const QString& EspArgument) {
   QTextStream Output(stdout);
   QTextStream Error(stderr);
@@ -305,7 +339,7 @@ void SortCandidates(QList<Candidate>* Results) {
 
   const QList<Candidate> Candidates = ScanEsp(EspRoot);
   const bool ExpectedCandidates =
-      Candidates.size() == 4 &&
+      Candidates.size() == 5 &&
       HasCandidate(
           Candidates,
           QStringLiteral("KALI LINUX"),
@@ -325,7 +359,16 @@ void SortCandidates(QList<Candidate>* Results) {
           Candidates,
           QStringLiteral("TOOLS EFI SYSTEM"),
           QStringLiteral("\\EFI\\tools\\shellx64.efi"),
-          QStringLiteral("generic"));
+          QStringLiteral("generic")) &&
+      HasCandidate(
+          Candidates,
+          QStringLiteral("UEFI FALLBACK (RECOVERY)"),
+          QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
+          QStringLiteral("generic")) &&
+      HasDefaultSelection(
+          Candidates,
+          QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
+          false);
   if (!ExpectedCandidates) {
     Error << "SELF-TEST FAIL: discovery or loader recognition mismatch\n";
     for (const Candidate& Entry : Candidates) {
@@ -349,23 +392,28 @@ void SortCandidates(QList<Candidate>* Results) {
       "LOADER|\\EFI\\kali\\grubx64.efi\n"
       "LOADER|\\EFI\\ubuntu\\grubx64.efi\n"
       "LOADER|\\EFI\\ubuntu\\shimx64.efi\n"
-      "LOADER|\\EFI\\tools\\shellx64.efi\n");
+      "LOADER|\\EFI\\tools\\shellx64.efi\n"
+      "LOADER|\\EFI\\BOOT\\BOOTX64.EFI\n");
   QString ProtocolError;
   const QList<Candidate> AuthorizedCandidates = ParseScanProtocol(
       EspRoot, AuthorizedProtocol, &ProtocolError);
-  if (!ProtocolError.isEmpty() || AuthorizedCandidates.size() != 4 ||
+  if (!ProtocolError.isEmpty() || AuthorizedCandidates.size() != 5 ||
       !HasCandidate(
           AuthorizedCandidates,
           QStringLiteral("UBUNTU LINUX"),
           QStringLiteral("\\EFI\\ubuntu\\shimx64.efi"),
-          QStringLiteral("linux"))) {
+          QStringLiteral("linux")) ||
+      !HasDefaultSelection(
+          AuthorizedCandidates,
+          QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
+          false)) {
     Error << "SELF-TEST FAIL: authorized scan protocol parsing mismatch\n";
     return 5;
   }
 
   Output << "PASS: regular-user discovery found " << Candidates.size()
-         << " systems, preferred shim, excluded APEX32, parsed authorized scan, "
-            "and generated schema 1\n";
+         << " systems, preferred shim, excluded APEX32, kept fallback as "
+            "unselected recovery, parsed authorized scan, and generated schema 1\n";
   return 0;
 }
 
@@ -390,9 +438,13 @@ class InstallerWindow final : public QWidget {
     Website->setAlignment(Qt::AlignCenter);
     Layout->addWidget(Website);
 
-    if (SafeTestMode_) {
-      auto* TestBanner = new QLabel(QStringLiteral(
-          "SAFE REGULAR-USER TEST // REAL INSTALLATION IS DISABLED"));
+    if (SafeTestMode_ || !kHardwareInstallEnabled) {
+      auto* TestBanner = new QLabel(
+          SafeTestMode_
+              ? QStringLiteral(
+                    "SAFE REGULAR-USER TEST // REAL INSTALLATION IS DISABLED")
+              : QStringLiteral(
+                    "SCAN-ONLY ALPHA // HARDWARE INSTALLATION IS DISABLED"));
       TestBanner->setAlignment(Qt::AlignCenter);
       TestBanner->setStyleSheet(QStringLiteral(
           "padding: 9px; color: #35f2e6; background: #10282b; "
@@ -452,32 +504,41 @@ class InstallerWindow final : public QWidget {
   void BuildInstallTab() {
     auto* Tab = new QWidget;
     auto* Layout = new QVBoxLayout(Tab);
-    auto* Explanation = new QLabel(QStringLiteral(
-        "APEX32 will copy the verified firmware application and generated "
-        "system configuration to the selected EFI System Partition. "
-        "A recovery backup is created before any existing APEX32 file is "
-        "replaced."));
+    auto* Explanation = new QLabel(
+        kHardwareInstallEnabled
+            ? QStringLiteral(
+                  "APEX32 will copy the verified firmware application and "
+                  "generated system configuration to the selected EFI System "
+                  "Partition. A recovery backup is created before any existing "
+                  "APEX32 file is replaced.")
+            : QStringLiteral(
+                  "This Community alpha is a read-only discovery preview. "
+                  "It can scan and display EFI loaders, but its hardware "
+                  "installation path is not included in this build."));
     Explanation->setWordWrap(true);
     Layout->addWidget(Explanation);
 
     auto* DefaultChoice = new QCheckBox(
         QStringLiteral("Make APEX32 Secure Gateway the default boot manager"));
-    DefaultChoice->setChecked(true);
+    DefaultChoice->setChecked(kHardwareInstallEnabled);
     DefaultChoice->setEnabled(false);
     Layout->addWidget(DefaultChoice);
 
     InstallButton_ = new QPushButton(
-        QStringLiteral("Install APEX32 and Make Default"));
+        kHardwareInstallEnabled
+            ? QStringLiteral("Install APEX32 and Make Default")
+            : QStringLiteral("Hardware Installation Disabled in Alpha"));
     InstallButton_->setMinimumHeight(52);
-    InstallButton_->setEnabled(!SafeTestMode_);
+    InstallButton_->setEnabled(
+        kHardwareInstallEnabled && !SafeTestMode_);
     connect(InstallButton_, &QPushButton::clicked, this, [this]() {
       InstallSelected();
     });
     Layout->addWidget(InstallButton_);
     InstallStatus_ = new QLabel(
-        SafeTestMode_
+        (!kHardwareInstallEnabled || SafeTestMode_)
             ? QStringLiteral(
-                  "Safe test mode is active. No ESP files or firmware variables can be changed.")
+                  "Scan-only safety gate is active. No ESP files or firmware variables can be changed.")
             : QStringLiteral("Ready for configuration."));
     InstallStatus_->setWordWrap(true);
     Layout->addWidget(InstallStatus_);
@@ -553,7 +614,8 @@ class InstallerWindow final : public QWidget {
     Table_->setRowCount(Candidates_.size());
     for (qsizetype Row = 0; Row < Candidates_.size(); ++Row) {
       auto* Enabled = new QCheckBox;
-      Enabled->setChecked(Row < 8);
+      Enabled->setChecked(
+          Row < 8 && Candidates_.at(Row).DefaultSelected);
       Enabled->setStyleSheet(QStringLiteral("margin-left: 12px"));
       Table_->setCellWidget(static_cast<int>(Row), 0, Enabled);
       Table_->setItem(
@@ -585,6 +647,15 @@ class InstallerWindow final : public QWidget {
   }
 
   void InstallSelected() {
+#if !APEX32_ENABLE_HARDWARE_INSTALL
+    QMessageBox::information(
+        this,
+        QStringLiteral("Hardware installation disabled"),
+        QStringLiteral(
+            "This Community alpha was built in scan-only mode. It cannot "
+            "write to the EFI System Partition or change UEFI boot order."));
+    return;
+#else
     if (EspRoot_.isEmpty() || Candidates_.isEmpty()) {
       QMessageBox::warning(
           this,
@@ -662,6 +733,7 @@ class InstallerWindow final : public QWidget {
       QMessageBox::critical(
           this, QStringLiteral("Installation failed"), InstallStatus_->text());
     }
+#endif
   }
 
   QTabWidget* Tabs_ = nullptr;
@@ -677,6 +749,12 @@ class InstallerWindow final : public QWidget {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if ((argc == 2) &&
+      (QString::fromLocal8Bit(argv[1]) == QStringLiteral("--capabilities"))) {
+    QCoreApplication Application(argc, argv);
+    return PrintCapabilities();
+  }
+
   if ((argc == 3) &&
       (QString::fromLocal8Bit(argv[1]) == QStringLiteral("--self-test"))) {
     QCoreApplication Application(argc, argv);

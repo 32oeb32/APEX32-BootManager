@@ -13,6 +13,10 @@
 
 #include <algorithm>
 
+#ifndef APEX32_ENABLE_HARDWARE_INSTALL
+#define APEX32_ENABLE_HARDWARE_INSTALL 0
+#endif
+
 namespace {
 
 [[nodiscard]] bool RequireRoot(QString* Error) {
@@ -80,6 +84,7 @@ namespace {
   return true;
 }
 
+#if APEX32_ENABLE_HARDWARE_INSTALL
 [[nodiscard]] bool CopyAtomically(
     const QString& Source,
     const QString& Destination,
@@ -255,6 +260,7 @@ namespace {
   sync();
   return ExitCode == 0;
 }
+#endif
 
 }  // namespace
 
@@ -281,10 +287,16 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+#if !APEX32_ENABLE_HARDWARE_INSTALL
+  ErrorStream
+      << "hardware installation is disabled in this scan-only build\n";
+  return 3;
+#else
   QString Error;
   if (!Install(Arguments.at(2), Arguments.at(3), Arguments.at(4), &Error)) {
     ErrorStream << Error << '\n';
     return 1;
   }
   return 0;
+#endif
 }

@@ -22,12 +22,14 @@ esp="${sandbox}/mock-esp"
 mkdir -p \
   "${esp}/EFI/APEX32" \
   "${esp}/EFI/Microsoft/Boot" \
+  "${esp}/EFI/BOOT" \
   "${esp}/EFI/kali" \
   "${esp}/EFI/ubuntu" \
   "${esp}/EFI/tools"
 touch \
   "${esp}/EFI/APEX32/Apex32BootManager.efi" \
   "${esp}/EFI/Microsoft/Boot/bootmgfw.efi" \
+  "${esp}/EFI/BOOT/BOOTX64.EFI" \
   "${esp}/EFI/kali/grubx64.efi" \
   "${esp}/EFI/ubuntu/grubx64.efi" \
   "${esp}/EFI/ubuntu/shimx64.efi" \

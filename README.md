@@ -28,8 +28,10 @@ personal APEX32 installation or development tree.
 - F2 read-only diagnostics;
 - a Linux Qt 6 installer prototype with **Systems → Scan Now**;
 - graphical authorization for read-only discovery on root-only ESP mounts;
-- a polkit-authorized helper design for installing APEX32 and making it first
-  in the UEFI boot order without terminal commands; and
+- a fail-closed, scan-only default build whose GUI and helper both omit the
+  unfinished hardware-install path;
+- a polkit-authorized helper design reserved for a future packaged installer
+  that will install APEX32 without terminal commands; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
   management, and recovery fallback behavior.
 
@@ -46,7 +48,13 @@ temporary; packaged beta users will launch the installer from their desktop.
 The installer guide includes a complete fresh-clone workflow, dependency
 setup, expected test output, Hyprland graphical authorization setup, a safe GUI
 demo, and an authorized read-only scan of the real ESP. It deliberately stops
-before installation on hardware.
+before installation on hardware. The source build reports `INSTALL|0`, keeps
+the Install control disabled, and rejects direct helper install requests.
+
+There is no Windows installer in this alpha. The planned Windows release is a
+signed graphical package using the normal UAC consent dialog; Windows users
+will not be asked to clone the repository or use a terminal. See
+[GUI installer release plan](Docs/GUI_INSTALLER_PLAN.md).
 
 ## Build the firmware
 
