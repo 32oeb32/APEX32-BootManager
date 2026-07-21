@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   build-windows-preview:
-    runs-on: windows-latest
+    # Qt uses the MSVC 2022 ABI, so keep the runner toolchain identical.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
 
