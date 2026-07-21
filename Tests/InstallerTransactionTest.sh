@@ -75,6 +75,30 @@ fi
    "$installed_config_hash" ]]
 [[ "$(<"${case_one}/state/order")" == "0007,0006,0003" ]]
 [[ -f "${case_one}/state/entry" ]]
+[[ -f "${case_one}/esp/EFI/APEX32/install-state.apex32" ]]
+
+: > "${case_one}/state/fail-next-bootorder"
+if "$helper" restore "${case_one}/esp" >/dev/null 2>&1; then
+  echo "FAIL: injected restore failure was accepted" >&2
+  exit 3
+fi
+[[ "$(sha256sum "${case_one}/esp/EFI/APEX32/Apex32BootManager.efi" | awk '{print $1}')" == \
+   "$installed_firmware_hash" ]]
+[[ "$(sha256sum "${case_one}/esp/EFI/APEX32/apex32.cfg" | awk '{print $1}')" == \
+   "$installed_config_hash" ]]
+[[ "$(<"${case_one}/state/order")" == "0007,0006,0003" ]]
+[[ -f "${case_one}/state/entry" ]]
+[[ -f "${case_one}/esp/EFI/APEX32/install-state.apex32" ]]
+
+"$helper" restore "${case_one}/esp"
+grep -q '^MZoriginal-firmware$' \
+  "${case_one}/esp/EFI/APEX32/Apex32BootManager.efi"
+grep -q '^ENTRY|ORIGINAL|' "${case_one}/esp/EFI/APEX32/apex32.cfg"
+[[ "$(<"${case_one}/state/order")" == "0006,0003" ]]
+[[ ! -e "${case_one}/state/entry" ]]
+[[ ! -e "${case_one}/esp/EFI/APEX32/install-state.apex32" ]]
+[[ ! -e "${case_one}/esp/EFI/APEX32/Apex32BootManager.efi.before-community" ]]
+[[ ! -e "${case_one}/esp/EFI/APEX32/apex32.cfg.before-community" ]]
 
 case_two="${root}/new-entry-failure"
 prepare_case "$case_two"
@@ -116,4 +140,5 @@ fi
 
 echo "PASS: transactional install, idempotent reinstall, and immutable backup"
 echo "PASS: injected boot-order failures restored files, order, and new entry"
+echo "PASS: restore failure rolled back safely, then full restore removed state"
 echo "PASS: transaction test binary was confined to its declared temporary ESP"

@@ -132,6 +132,20 @@ namespace {
   return true;
 }
 
+[[nodiscard]] bool WriteAtomically(
+    const QString& Destination,
+    const QByteArray& Data,
+    QString* Error) {
+  QSaveFile Output(Destination);
+  Output.setDirectWriteFallback(false);
+  if (!Output.open(QIODevice::WriteOnly) ||
+      Output.write(Data) != Data.size() || !Output.commit()) {
+    *Error = QStringLiteral("cannot write %1").arg(Destination);
+    return false;
+  }
+  return true;
+}
+
 [[nodiscard]] bool FilesMatch(
     const QString& LeftPath,
     const QString& RightPath,
@@ -206,6 +220,77 @@ namespace {
     Item = Item.trimmed().toUpper();
   }
   return Items.join(',');
+}
+
+struct InstallState final {
+  QString OriginalOrder;
+  bool FirmwareExisted = false;
+  bool ConfigExisted = false;
+  bool EntryExisted = false;
+};
+
+[[nodiscard]] QByteArray SerializeInstallState(const InstallState& State) {
+  QByteArray Result("APEX32STATE|1\n");
+  Result += "ORIGINAL_BOOT_ORDER|" + State.OriginalOrder.toUtf8() + '\n';
+  Result += "HAD_FIRMWARE|";
+  Result += (State.FirmwareExisted ? "1\n" : "0\n");
+  Result += "HAD_CONFIG|";
+  Result += (State.ConfigExisted ? "1\n" : "0\n");
+  Result += "HAD_ENTRY|";
+  Result += (State.EntryExisted ? "1\n" : "0\n");
+  return Result;
+}
+
+[[nodiscard]] bool ParseBooleanState(
+    const QByteArray& Line,
+    const QByteArray& Prefix,
+    bool* Value) {
+  if (!Line.startsWith(Prefix)) {
+    return false;
+  }
+  const QByteArray Encoded = Line.mid(Prefix.size()).trimmed();
+  if (Encoded == "0") {
+    *Value = false;
+    return true;
+  }
+  if (Encoded == "1") {
+    *Value = true;
+    return true;
+  }
+  return false;
+}
+
+[[nodiscard]] bool ReadInstallState(
+    const QString& Path,
+    InstallState* State,
+    QString* Error) {
+  QFile Input(Path);
+  if (!Input.open(QIODevice::ReadOnly)) {
+    *Error = QStringLiteral("cannot read installer recovery state");
+    return false;
+  }
+  const QList<QByteArray> Lines = Input.readAll().split('\n');
+  if (Lines.size() < 5 || Lines.at(0) != "APEX32STATE|1" ||
+      !Lines.at(1).startsWith("ORIGINAL_BOOT_ORDER|")) {
+    *Error = QStringLiteral("installer recovery state is invalid");
+    return false;
+  }
+  State->OriginalOrder = QString::fromUtf8(
+      Lines.at(1).mid(QByteArray("ORIGINAL_BOOT_ORDER|").size())).trimmed();
+  const QRegularExpression OrderPattern(
+      QStringLiteral("^[0-9A-Fa-f]{4}(,[0-9A-Fa-f]{4})*$"));
+  if (!OrderPattern.match(State->OriginalOrder).hasMatch() ||
+      !ParseBooleanState(
+          Lines.at(2), QByteArray("HAD_FIRMWARE|"), &State->FirmwareExisted) ||
+      !ParseBooleanState(
+          Lines.at(3), QByteArray("HAD_CONFIG|"), &State->ConfigExisted) ||
+      !ParseBooleanState(
+          Lines.at(4), QByteArray("HAD_ENTRY|"), &State->EntryExisted)) {
+    *Error = QStringLiteral("installer recovery state is invalid");
+    return false;
+  }
+  State->OriginalOrder = State->OriginalOrder.toUpper();
+  return true;
 }
 
 void RemoveTransactionFiles(const QStringList& Paths) {
@@ -345,12 +430,15 @@ void RollBack(
       QStringLiteral("Apex32BootManager.efi"));
   const QString ConfigDestination = ApexDirectory.filePath(
       QStringLiteral("apex32.cfg"));
+  const QString StatePath = ApexDirectory.filePath(
+      QStringLiteral("install-state.apex32"));
   const QString FirmwareBackup = ApexDirectory.filePath(
       QStringLiteral("Apex32BootManager.efi.before-community"));
   const QString ConfigBackup = ApexDirectory.filePath(
       QStringLiteral("apex32.cfg.before-community"));
   const bool FirmwareBackupExisted = QFileInfo::exists(FirmwareBackup);
   const bool ConfigBackupExisted = QFileInfo::exists(ConfigBackup);
+  const bool StateExisted = QFileInfo::exists(StatePath);
   const QString FirmwarePending = ApexDirectory.filePath(
       QStringLiteral(".Apex32BootManager.efi.pending"));
   const QString ConfigPending = ApexDirectory.filePath(
@@ -388,6 +476,27 @@ void RollBack(
   const bool EntryExisted = OriginalEntryIds.size() == 1;
   const bool FirmwareExisted = QFileInfo::exists(Destination);
   const bool ConfigExisted = QFileInfo::exists(ConfigDestination);
+  InstallState RecoveryState;
+  if (StateExisted) {
+    if (!ReadInstallState(StatePath, &RecoveryState, Error) ||
+        (RecoveryState.FirmwareExisted && !FirmwareBackupExisted) ||
+        (RecoveryState.ConfigExisted && !ConfigBackupExisted)) {
+      if (Error->isEmpty()) {
+        *Error = QStringLiteral("installer recovery backup is incomplete");
+      }
+      return false;
+    }
+  } else {
+    if (FirmwareBackupExisted || ConfigBackupExisted) {
+      *Error = QStringLiteral(
+          "legacy backups exist without validated installer recovery state");
+      return false;
+    }
+    RecoveryState.OriginalOrder = OriginalOrder;
+    RecoveryState.FirmwareExisted = FirmwareExisted;
+    RecoveryState.ConfigExisted = ConfigExisted;
+    RecoveryState.EntryExisted = EntryExisted;
+  }
 
   if (!CopyAtomically(
           FirmwareInfo.canonicalFilePath(), FirmwarePending, Error) ||
@@ -426,6 +535,9 @@ void RollBack(
     }
     if (!ConfigBackupExisted) {
       (void)QFile::remove(ConfigBackup);
+    }
+    if (!StateExisted) {
+      (void)QFile::remove(StatePath);
     }
     sync();
     return false;
@@ -526,16 +638,174 @@ void RollBack(
     return FailCommittedTransaction(VerificationError);
   }
 
-  if (FirmwareExisted && !FirmwareBackupExisted &&
+  if (!StateExisted && FirmwareExisted && !FirmwareBackupExisted &&
       !CopyAtomically(FirmwareSnapshot, FirmwareBackup, Error)) {
     return FailCommittedTransaction(*Error);
   }
-  if (ConfigExisted && !ConfigBackupExisted &&
+  if (!StateExisted && ConfigExisted && !ConfigBackupExisted &&
       !CopyAtomically(ConfigSnapshot, ConfigBackup, Error)) {
+    return FailCommittedTransaction(*Error);
+  }
+  if (!StateExisted &&
+      !WriteAtomically(
+          StatePath, SerializeInstallState(RecoveryState), Error)) {
     return FailCommittedTransaction(*Error);
   }
 
   RemoveTransactionFiles(TransactionFiles);
+  sync();
+  return true;
+}
+
+[[nodiscard]] bool Restore(const QString& EspArgument, QString* Error) {
+  if (!RequireMutationAccess(EspArgument, Error)) {
+    return false;
+  }
+
+  const QFileInfo EspInfo(EspArgument);
+  const QString Esp = EspInfo.canonicalFilePath();
+  const QDir ApexDirectory(QDir(Esp).filePath(QStringLiteral("EFI/APEX32")));
+  if (Esp.isEmpty() || !EspInfo.isDir() || !ApexDirectory.exists()) {
+    *Error = QStringLiteral("invalid EFI System Partition mount point");
+    return false;
+  }
+
+  const QString Destination = ApexDirectory.filePath(
+      QStringLiteral("Apex32BootManager.efi"));
+  const QString ConfigDestination = ApexDirectory.filePath(
+      QStringLiteral("apex32.cfg"));
+  const QString FirmwareBackup = ApexDirectory.filePath(
+      QStringLiteral("Apex32BootManager.efi.before-community"));
+  const QString ConfigBackup = ApexDirectory.filePath(
+      QStringLiteral("apex32.cfg.before-community"));
+  const QString StatePath = ApexDirectory.filePath(
+      QStringLiteral("install-state.apex32"));
+  const QString FirmwareSnapshot = ApexDirectory.filePath(
+      QStringLiteral(".Apex32BootManager.efi.restore-rollback"));
+  const QString ConfigSnapshot = ApexDirectory.filePath(
+      QStringLiteral(".apex32.cfg.restore-rollback"));
+  const QStringList RestoreSnapshots = {FirmwareSnapshot, ConfigSnapshot};
+  for (const QString& Path : RestoreSnapshots) {
+    if (QFileInfo::exists(Path)) {
+      *Error = QStringLiteral(
+          "unfinished restore transaction detected; recovery is required");
+      return false;
+    }
+  }
+
+  InstallState State;
+  if (!ReadInstallState(StatePath, &State, Error) ||
+      (State.FirmwareExisted && !QFileInfo::exists(FirmwareBackup)) ||
+      (State.ConfigExisted && !QFileInfo::exists(ConfigBackup))) {
+    if (Error->isEmpty()) {
+      *Error = QStringLiteral("installer recovery backup is incomplete");
+    }
+    return false;
+  }
+
+  const bool CurrentFirmwareExisted = QFileInfo::exists(Destination);
+  const bool CurrentConfigExisted = QFileInfo::exists(ConfigDestination);
+  if ((CurrentFirmwareExisted &&
+       !CopyAtomically(Destination, FirmwareSnapshot, Error)) ||
+      (CurrentConfigExisted &&
+       !CopyAtomically(ConfigDestination, ConfigSnapshot, Error))) {
+    RemoveTransactionFiles(RestoreSnapshots);
+    return false;
+  }
+
+  int ExitCode = 0;
+  const QString CurrentEntries = RunCommand(
+      ToolPath(QStringLiteral("efibootmgr")), {}, &ExitCode, Error);
+  const QString CurrentOrder = BootOrder(CurrentEntries);
+  if (ExitCode != 0 || CurrentOrder.isEmpty()) {
+    RemoveTransactionFiles(RestoreSnapshots);
+    return false;
+  }
+
+  auto FailRestore = [&](const QString& Failure) {
+    *Error = Failure;
+    RollBack(
+        Destination,
+        ConfigDestination,
+        FirmwareSnapshot,
+        ConfigSnapshot,
+        CurrentFirmwareExisted,
+        CurrentConfigExisted,
+        CurrentOrder,
+        true,
+        Error);
+    RemoveTransactionFiles(RestoreSnapshots);
+    sync();
+    return false;
+  };
+
+  if (!RestoreFile(
+          Destination,
+          FirmwareBackup,
+          State.FirmwareExisted,
+          Error) ||
+      !RestoreFile(
+          ConfigDestination,
+          ConfigBackup,
+          State.ConfigExisted,
+          Error)) {
+    return FailRestore(*Error);
+  }
+  if ((State.FirmwareExisted &&
+       !FilesMatch(FirmwareBackup, Destination, Error)) ||
+      (State.ConfigExisted &&
+       !FilesMatch(ConfigBackup, ConfigDestination, Error)) ||
+      (!State.FirmwareExisted && QFileInfo::exists(Destination)) ||
+      (!State.ConfigExisted && QFileInfo::exists(ConfigDestination))) {
+    if (Error->isEmpty()) {
+      *Error = QStringLiteral("restored file verification failed");
+    }
+    return FailRestore(*Error);
+  }
+
+  (void)RunCommand(
+      ToolPath(QStringLiteral("efibootmgr")),
+      {QStringLiteral("-o"), State.OriginalOrder},
+      &ExitCode,
+      Error);
+  if (ExitCode != 0) {
+    return FailRestore(*Error);
+  }
+
+  if (!State.EntryExisted) {
+    const QString Entries = RunCommand(
+        ToolPath(QStringLiteral("efibootmgr")), {}, &ExitCode, Error);
+    if (ExitCode != 0) {
+      return FailRestore(*Error);
+    }
+    const QStringList Ids = ApexEntryIds(Entries);
+    if (Ids.size() != 1) {
+      return FailRestore(
+          QStringLiteral("cannot identify the installed APEX32 entry"));
+    }
+    (void)RunCommand(
+        ToolPath(QStringLiteral("efibootmgr")),
+        {QStringLiteral("-b"), Ids.first(), QStringLiteral("-B")},
+        &ExitCode,
+        Error);
+    if (ExitCode != 0) {
+      return FailRestore(*Error);
+    }
+  }
+
+  const QString VerifiedEntries = RunCommand(
+      ToolPath(QStringLiteral("efibootmgr")), {}, &ExitCode, Error);
+  if (ExitCode != 0 || BootOrder(VerifiedEntries) != State.OriginalOrder ||
+      (!State.EntryExisted && !ApexEntryIds(VerifiedEntries).isEmpty())) {
+    *Error = QStringLiteral("post-restore firmware verification failed");
+    RemoveTransactionFiles(RestoreSnapshots);
+    return false;
+  }
+
+  RemoveTransactionFiles(RestoreSnapshots);
+  (void)QFile::remove(StatePath);
+  (void)QFile::remove(FirmwareBackup);
+  (void)QFile::remove(ConfigBackup);
   sync();
   return true;
 }
@@ -558,6 +828,22 @@ int main(int argc, char** argv) {
     QTextStream OutputStream(stdout);
     OutputStream << QString::fromUtf8(Protocol);
     return 0;
+  }
+
+  if ((Arguments.size() == 3) &&
+      (Arguments.at(1) == QStringLiteral("restore"))) {
+#if !APEX32_ENABLE_HARDWARE_INSTALL
+    ErrorStream
+        << "hardware restore is disabled in this scan-only build\n";
+    return 3;
+#else
+    QString Error;
+    if (!Restore(Arguments.at(2), &Error)) {
+      ErrorStream << Error << '\n';
+      return 1;
+    }
+    return 0;
+#endif
   }
 
   if ((Arguments.size() != 5) ||

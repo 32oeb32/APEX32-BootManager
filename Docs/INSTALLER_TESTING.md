@@ -88,6 +88,7 @@ PASS: fallback install, immutable backup, status, and restore
 PASS: regular-user discovery found 5 systems, preferred shim, excluded APEX32, kept fallback as unselected recovery, parsed authorized scan, and generated schema 1
 PASS: transactional install, idempotent reinstall, and immutable backup
 PASS: injected boot-order failures restored files, order, and new entry
+PASS: restore failure rolled back safely, then full restore removed state
 PASS: transaction test binary was confined to its declared temporary ESP
 PASS: helper enforced scan-only install gate and refused unprivileged scan
 PASS: hardware-install opt-in required firmware and the mock ESP was unchanged
@@ -120,6 +121,7 @@ The final capability output must be:
 APEX32CAPS|1
 SCAN|1
 INSTALL|0
+RESTORE|0
 TERMINAL_AUTH|0
 ```
 

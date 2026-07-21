@@ -61,7 +61,7 @@ cmake --build \
   --parallel \
   >/dev/null
 
-expected_capabilities=$'APEX32CAPS|1\nSCAN|1\nINSTALL|0\nTERMINAL_AUTH|0'
+expected_capabilities=$'APEX32CAPS|1\nSCAN|1\nINSTALL|0\nRESTORE|0\nTERMINAL_AUTH|0'
 actual_capabilities="$("${build_dir}/apex32-installer" --capabilities)"
 if [[ "${actual_capabilities}" != "${expected_capabilities}" ]]; then
   echo "FAIL: source build did not report the scan-only capability gate" >&2
@@ -83,6 +83,18 @@ set -e
 if [[ ${helper_result} -eq 0 ]] ||
    [[ "${helper_error}" != *"hardware installation is disabled in this scan-only build"* ]]; then
   echo "FAIL: helper did not enforce the compiled scan-only gate" >&2
+  exit 3
+fi
+
+set +e
+restore_error="$(
+  "${build_dir}/apex32-installer-helper" restore "${esp}" 2>&1
+)"
+restore_result=$?
+set -e
+if [[ ${restore_result} -eq 0 ]] ||
+   [[ "${restore_error}" != *"hardware restore is disabled in this scan-only build"* ]]; then
+  echo "FAIL: helper did not enforce the compiled scan-only restore gate" >&2
   exit 3
 fi
 

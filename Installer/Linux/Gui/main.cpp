@@ -324,6 +324,7 @@ void SortCandidates(QList<Candidate>* Results) {
   Output << "APEX32CAPS|1\n"
          << "SCAN|1\n"
          << "INSTALL|" << (kHardwareInstallEnabled ? 1 : 0) << '\n'
+         << "RESTORE|" << (kHardwareInstallEnabled ? 1 : 0) << '\n'
          << "TERMINAL_AUTH|0\n";
   return 0;
 }
@@ -549,12 +550,28 @@ class InstallerWindow final : public QWidget {
   void BuildRecoveryTab() {
     auto* Tab = new QWidget;
     auto* Layout = new QVBoxLayout(Tab);
-    auto* Text = new QLabel(QStringLiteral(
-        "The installer preserves the previous APEX32 firmware file before "
-        "replacement. Recovery and uninstall actions will be enabled after "
-        "the first hardware-tested Community package."));
+    auto* Text = new QLabel(
+        kHardwareInstallEnabled
+            ? QStringLiteral(
+                  "Restore returns APEX32 files and the UEFI boot order to "
+                  "their verified pre-install state. If APEX32 created the "
+                  "firmware entry, Restore removes it.")
+            : QStringLiteral(
+                  "Recovery is covered by confined transaction tests, but "
+                  "hardware Restore remains disabled in this public alpha."));
     Text->setWordWrap(true);
     Layout->addWidget(Text);
+    RestoreButton_ = new QPushButton(
+        kHardwareInstallEnabled
+            ? QStringLiteral("Restore Previous Boot Manager")
+            : QStringLiteral("Hardware Restore Disabled in Alpha"));
+    RestoreButton_->setMinimumHeight(52);
+    RestoreButton_->setEnabled(
+        kHardwareInstallEnabled && !SafeTestMode_);
+    connect(RestoreButton_, &QPushButton::clicked, this, [this]() {
+      RestorePrevious();
+    });
+    Layout->addWidget(RestoreButton_);
     Layout->addStretch();
     Tabs_->addTab(Tab, QStringLiteral("Recovery"));
   }
@@ -736,10 +753,57 @@ class InstallerWindow final : public QWidget {
 #endif
   }
 
+  void RestorePrevious() {
+#if !APEX32_ENABLE_HARDWARE_INSTALL
+    QMessageBox::information(
+        this,
+        QStringLiteral("Hardware restore disabled"),
+        QStringLiteral(
+            "This Community alpha was built in scan-only mode. It cannot "
+            "change EFI files or firmware boot order."));
+    return;
+#else
+    if (EspRoot_.isEmpty()) {
+      QMessageBox::warning(
+          this,
+          QStringLiteral("EFI partition unavailable"),
+          QStringLiteral("Select Systems, then choose Scan Now first."));
+      return;
+    }
+    const QString Helper = QStringLiteral(
+        "/usr/libexec/apex32/apex32-installer-helper");
+    QProcess Process;
+    Process.start(
+        QStringLiteral("/usr/bin/pkexec"),
+        {QStringLiteral("--disable-internal-agent"),
+         Helper,
+         QStringLiteral("restore"),
+         EspRoot_});
+    Process.waitForFinished(-1);
+    if ((Process.exitStatus() == QProcess::NormalExit) &&
+        (Process.exitCode() == 0)) {
+      QMessageBox::information(
+          this,
+          QStringLiteral("APEX32 restored"),
+          QStringLiteral(
+              "EFI files and boot order were restored to their pre-install state."));
+    } else {
+      const QString Error = QString::fromUtf8(
+          Process.readAllStandardError()).trimmed();
+      QMessageBox::critical(
+          this,
+          QStringLiteral("Restore failed"),
+          Error.isEmpty() ? QStringLiteral("Restore failed without details.")
+                          : Error);
+    }
+#endif
+  }
+
   QTabWidget* Tabs_ = nullptr;
   QLabel* EspLabel_ = nullptr;
   QLabel* InstallStatus_ = nullptr;
   QPushButton* InstallButton_ = nullptr;
+  QPushButton* RestoreButton_ = nullptr;
   QTableWidget* Table_ = nullptr;
   QString EspRoot_;
   QList<Candidate> Candidates_;

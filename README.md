@@ -31,7 +31,8 @@ personal APEX32 installation or development tree.
 - a fail-closed, scan-only default build whose GUI and helper both omit the
   unfinished hardware-install path;
 - an isolated mock-ESP transaction test covering verified staging,
-  duplicate-free reinstall, immutable backup, and automatic rollback;
+  duplicate-free reinstall, immutable backup, automatic rollback, persistent
+  recovery state, and full restore/uninstall semantics;
 - a polkit-authorized helper design reserved for a future packaged installer
   that will install APEX32 without terminal commands; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry

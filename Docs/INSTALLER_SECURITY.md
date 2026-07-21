@@ -51,7 +51,9 @@ the system temporary directory. Tool calls are redirected to deterministic
 test stubs.
 
 The transaction test covers staged SHA-256 verification, current-file
-snapshots, immutable original backups, duplicate-free reinstall, post-install
-verification, and rollback after an injected boot-order failure. The public
-helper remains scan-only while this foundation is reviewed and extended with
-restore/uninstall and QEMU/OVMF coverage.
+snapshots, immutable original backups, persistent pre-install state,
+duplicate-free reinstall, post-install verification, rollback after an
+injected boot-order failure, an injected restore failure, and complete restore
+of files, boot order, and firmware-entry ownership. The public helper remains
+scan-only while this foundation is reviewed and extended with QEMU/OVMF
+coverage.
