@@ -17,7 +17,7 @@ fi
 
 for program in \
   apt-get appstreamcli awk cmp desktop-file-validate dpkg-deb dpkg-query \
-  mountpoint realpath sha256sum stat sudo; do
+  find grep mountpoint realpath sha256sum sort stat sudo tar; do
   command -v "${program}" >/dev/null 2>&1 || {
     echo "FAIL: missing lifecycle dependency: ${program}" >&2
     exit 2
@@ -32,12 +32,34 @@ package_name="$(dpkg-deb --field "${package}" Package)"
   exit 3
 }
 
-if mountpoint -q /boot/efi 2>/dev/null ||
-   mountpoint -q /sys/firmware/efi/efivars 2>/dev/null ||
-   [[ -e /boot/efi/EFI/APEX32 ]]; then
-  echo "FAIL: lifecycle test refuses a host with a real ESP or EFI variables" >&2
+control_listing="$(dpkg-deb --ctrl-tarfile "${package}" | tar -tf -)"
+for maintainer_script in preinst postinst prerm postrm; do
+  if grep -Fqx "./${maintainer_script}" <<<"${control_listing}" ||
+     grep -Fqx "${maintainer_script}" <<<"${control_listing}"; then
+    echo "FAIL: package contains maintainer script: ${maintainer_script}" >&2
+    exit 3
+  fi
+done
+
+if mountpoint -q /boot/efi 2>/dev/null; then
+  echo "FAIL: lifecycle test refuses a host with a mounted /boot/efi" >&2
   exit 3
 fi
+if [[ -e /boot/efi/EFI/APEX32 ]]; then
+  echo "FAIL: lifecycle test refuses a host containing /boot/efi/EFI/APEX32" >&2
+  exit 3
+fi
+
+snapshot_efivars() {
+  local efivar_path=/sys/firmware/efi/efivars
+
+  if mountpoint -q "${efivar_path}" 2>/dev/null; then
+    sudo find "${efivar_path}" -maxdepth 1 -type f \
+      -exec sha256sum {} + | LC_ALL=C sort
+  fi
+}
+
+efivar_snapshot_before="$(snapshot_efivars)"
 
 cleanup() {
   sudo env DEBIAN_FRONTEND=noninteractive \
@@ -85,7 +107,6 @@ sudo env DEBIAN_FRONTEND=noninteractive \
 
 sudo env DEBIAN_FRONTEND=noninteractive \
   apt-get purge --yes "${package_name}"
-trap - EXIT
 
 if dpkg-query -W "${package_name}" >/dev/null 2>&1; then
   echo "FAIL: package remains registered after purge" >&2
@@ -101,6 +122,15 @@ for path in \
 done
 [[ ! -e /boot/efi/EFI/APEX32 ]]
 
+efivar_snapshot_after="$(snapshot_efivars)"
+if [[ "${efivar_snapshot_after}" != "${efivar_snapshot_before}" ]]; then
+  echo "FAIL: EFI variables changed during package lifecycle testing" >&2
+  exit 6
+fi
+
+trap - EXIT
+
 echo "PASS: disposable runner installed the Debian package with protected ownership and complete desktop metadata"
 echo "PASS: package reinstall preserved the verified firmware and install/restore capability mode"
-echo "PASS: package purge removed every packaged path without touching an ESP or UEFI variables"
+echo "PASS: package has no maintainer scripts and purge removed every packaged path"
+echo "PASS: package lifecycle left the ESP and EFI-variable snapshot unchanged"

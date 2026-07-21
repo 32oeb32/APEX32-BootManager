@@ -244,5 +244,7 @@ EDK II artifact.
 CI follows that inspection with `Tools/test-linux-package-lifecycle.sh`. This
 second test performs a real package-manager install, reinstall, and purge only
 on a disposable GitHub runner. It refuses local execution, a mounted
-`/boot/efi`, or an EFI variable filesystem. It never launches the privileged
-install operation.
+`/boot/efi`, or an existing APEX32 ESP path. Before installation it rejects
+packages containing Debian maintainer scripts. If the runner exposes an EFI
+variable filesystem, the test snapshots every variable and requires the exact
+same snapshot after purge. It never launches the privileged install operation.
