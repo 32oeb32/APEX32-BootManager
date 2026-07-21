@@ -16,6 +16,9 @@
       recovery state so the previous boot files and order can be restored.
     </p>
   </description>
+  <categories>
+    <category>System</category>
+  </categories>
   <launchable type="desktop-id">apex32-installer.desktop</launchable>
   <icon type="stock">apex32-installer</icon>
   <provides>
