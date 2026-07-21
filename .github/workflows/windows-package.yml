@@ -28,17 +28,21 @@ jobs:
           cmake `
             -S Installer/Windows `
             -B Installer/Windows/build `
-            -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
             -DCMAKE_PREFIX_PATH="$qt"
-          cmake --build Installer/Windows/build --parallel
+          cmake --build Installer/Windows/build --config Release --parallel
+          cmake `
+            --install Installer/Windows/build `
+            --config Release `
+            --prefix Installer/Windows/build/stage
 
       - name: Verify fail-closed capabilities
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $probe = Start-Process `
-            -FilePath Installer/Windows/build/apex32-installer.exe `
+            -FilePath Installer/Windows/build/stage/bin/apex32-installer.exe `
             -ArgumentList @(
               "--capabilities-file",
               "Installer/Windows/build/capabilities.txt"
@@ -64,7 +68,9 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "C:/Program Files (x86)/NSIS;$env:PATH"
-          cpack --config Installer/Windows/build/CPackConfig.cmake
+          cpack `
+            --config Installer/Windows/build/CPackConfig.cmake `
+            -C Release
           $setups = @(Get-ChildItem Installer/Windows/build -Filter "APEX32-Community-Setup*.exe")
           if ($setups.Count -ne 1) {
             throw "Expected one Windows setup executable"

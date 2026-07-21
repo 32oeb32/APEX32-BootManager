@@ -22,15 +22,26 @@ Authoritative Windows references:
 - [BCDEdit](https://learn.microsoft.com/windows-server/administration/windows-commands/bcdedit)
 - [SetFirmwareEnvironmentVariableExW](https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-setfirmwareenvironmentvariableexw)
 
-## Contributor build
+## VS Code and contributor build
 
-On a Windows x86_64 development host with Qt 6, CMake, Ninja, and NSIS:
+Open the complete `APEX32-BootManager` repository folder in VS Code. Do not
+open only `Installer/Windows`, because the installer packages shared project
+files such as `LICENSE` and `DISCLAIMER.md`.
+
+On a Windows x86_64 development host with Qt 6 for MSVC 2022, Visual Studio
+2022 Build Tools, CMake, and NSIS, run these commands from the repository root:
 
 ```powershell
-cmake -S Installer/Windows -B Installer/Windows/build -G Ninja
-cmake --build Installer/Windows/build --parallel
-cpack --config Installer/Windows/build/CPackConfig.cmake
+cmake -S Installer/Windows -B Installer/Windows/build `
+  -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+cmake --build Installer/Windows/build --config Release --parallel
+cpack --config Installer/Windows/build/CPackConfig.cmake -C Release
 ```
+
+The Windows GUI source is `Installer/Windows/Gui/main.cpp`. The Windows build
+definition is `Installer/Windows/CMakeLists.txt`; the UEFI boot manager itself
+is still built from the repository-level `Apex32BootManager.dsc`.
 
 Release users will not run these commands. They will download and double-click
 the generated setup executable from GitHub or apex32-secure.com.
