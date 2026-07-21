@@ -1,5 +1,19 @@
 # Community roadmap
 
+## PR #4 — graphics foundation
+
+- reusable clipped GOP renderer with canonical back buffer
+- 1920×1080 logical canvas with centered letterboxing
+- alpha blending, gradients, borders, lines, images, and aligned embedded text
+- original APEX32 emblem
+- dynamic one-to-four-card pages for up to 32 validated entries
+- pluggable OS identity registry and generic unknown-loader fallback
+- resolution, overflow, and regional OVMF framebuffer validation
+
+PR #4 deliberately leaves installation behavior unchanged and does not access
+the host ESP. Native `Boot####`/multi-ESP enumeration remains a later discovery
+milestone rather than being mixed into the renderer.
+
 ## 0.10.0-alpha1 — dynamic public foundation
 
 - GPL-3.0 repository foundation

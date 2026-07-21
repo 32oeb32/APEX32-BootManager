@@ -21,6 +21,7 @@ class ScreenMetrics:
     dark_pixels: int
     cyan_pixels: int
     red_pixels: int
+    center_accent_pixels: int
 
     @property
     def total_pixels(self) -> int:
@@ -81,15 +82,26 @@ def analyze_screen(width: int, height: int, pixels: bytes) -> ScreenMetrics:
     dark = 0
     cyan = 0
     red = 0
-    for offset in range(0, len(pixels), 3):
+    center_accent = 0
+    left = width // 5
+    right = width - left
+    top = height // 10
+    bottom = height - top
+    for pixel_index, offset in enumerate(range(0, len(pixels), 3)):
         r, g, b = pixels[offset : offset + 3]
         if max(r, g, b) <= 56:
             dark += 1
-        if g >= 110 and b >= 125 and g > r * 1.30 and b > r * 1.35:
+        is_cyan = g >= 110 and b >= 125 and g > r * 1.30 and b > r * 1.35
+        is_red = r >= 125 and r > g * 1.45 and r > b * 1.25
+        if is_cyan:
             cyan += 1
-        if r >= 125 and r > g * 1.45 and r > b * 1.25:
+        if is_red:
             red += 1
-    return ScreenMetrics(width, height, dark, cyan, red)
+        x = pixel_index % width
+        y = pixel_index // width
+        if left <= x < right and top <= y < bottom and (is_cyan or is_red):
+            center_accent += 1
+    return ScreenMetrics(width, height, dark, cyan, red, center_accent)
 
 
 def looks_like_apex32(metrics: ScreenMetrics) -> bool:
@@ -100,6 +112,7 @@ def looks_like_apex32(metrics: ScreenMetrics) -> bool:
         and metrics.dark_ratio >= 0.40
         and metrics.cyan_pixels >= max(300, total // 1200)
         and metrics.red_pixels >= 60
+        and metrics.center_accent_pixels >= max(120, total // 5000)
     )
 
 
@@ -169,10 +182,13 @@ def run_self_test() -> int:
     # not grow in proportion to the framebuffer.
     width, height = 1280, 800
     pixels = bytearray((2, 8, 12) * (width * height))
+    center_start = ((height // 3) * width) + (width // 3)
     for index in range(0, 1000):
-        pixels[index * 3 : index * 3 + 3] = bytes((33, 212, 234))
+        offset = (center_start + index) * 3
+        pixels[offset : offset + 3] = bytes((33, 212, 234))
     for index in range(1000, 1093):
-        pixels[index * 3 : index * 3 + 3] = bytes((239, 77, 50))
+        offset = (center_start + index) * 3
+        pixels[offset : offset + 3] = bytes((239, 77, 50))
     with tempfile.TemporaryDirectory(prefix="apex32-ppm-self-test-") as directory:
         ppm = Path(directory) / "framebuffer.ppm"
         ppm.write_bytes(
@@ -270,7 +286,8 @@ def main() -> int:
                             print(
                                 "PASS: APEX32 reached a stable OVMF framebuffer "
                                 f"({width}x{height}, dark={last_metrics.dark_ratio:.1%}, "
-                                f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels})"
+                                f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels}, "
+                                f"center={last_metrics.center_accent_pixels})"
                             )
                             return 0
 
@@ -303,7 +320,8 @@ def main() -> int:
                 "FAIL: framebuffer never matched the APEX32 gateway palette "
                 f"({last_metrics.width}x{last_metrics.height}, "
                 f"dark={last_metrics.dark_ratio:.1%}, "
-                f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels})",
+                f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels}, "
+                f"center={last_metrics.center_accent_pixels})",
                 file=sys.stderr,
             )
         else:

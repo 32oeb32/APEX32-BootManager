@@ -4,10 +4,11 @@ extern "C" {
 #include <Library/UefiBootServicesTableLib.h>
 }
 
-#include "Assets/OsLogos.hpp"
+#include "Assets/OsIdentity.hpp"
 #include "Boot/BootDiscovery.hpp"
 #include "Boot/EfiLoader.hpp"
 #include "Fonts/Font5x7.hpp"
+#include "Menu/CardLayout.hpp"
 #include "Renderer/GopRenderer.hpp"
 #include "Themes/DefaultTheme.hpp"
 
@@ -162,9 +163,9 @@ void FormatDisplayMode(
     const UINTN Capacity) noexcept {
   Buffer[0] = '\0';
   UINTN Offset = 0;
-  AppendDecimal(Buffer, Capacity, &Offset, Renderer.Width());
+  AppendDecimal(Buffer, Capacity, &Offset, Renderer.PhysicalWidth());
   AppendText(Buffer, Capacity, &Offset, " X ");
-  AppendDecimal(Buffer, Capacity, &Offset, Renderer.Height());
+  AppendDecimal(Buffer, Capacity, &Offset, Renderer.PhysicalHeight());
 }
 
 void FormatEntryCount(
@@ -397,29 +398,6 @@ void DrawCircuitRail(
   }
 }
 
-void DrawBitmapLogo(
-    GopRenderer& Renderer,
-    const UINTN CenterX,
-    const UINTN Top,
-    const UINTN Unit,
-    const oslogos::MonochromeLogo& Logo,
-    const RgbColor Color) noexcept {
-  const UINTN Scale = AtLeastOne(Unit / 10U);
-  const UINTN RenderedWidth = Logo.Width * Scale;
-  const UINTN X = (CenterX >= (RenderedWidth / 2U))
-                      ? (CenterX - (RenderedWidth / 2U))
-                      : 0U;
-  Renderer.DrawMonochromeBitmap(
-      Logo.Data,
-      Logo.Width,
-      Logo.Height,
-      Logo.BytesPerRow,
-      X,
-      Top,
-      Scale,
-      Color);
-}
-
 void DrawEntryLogo(
     GopRenderer& Renderer,
     const BootEntry& Entry,
@@ -427,43 +405,8 @@ void DrawEntryLogo(
     const UINTN Top,
     const UINTN Unit,
     const RgbColor Color) noexcept {
-  if (Entry.Icon == OsIcon::Kali) {
-    DrawBitmapLogo(Renderer, CenterX, Top, Unit, oslogos::kKali, Color);
-    return;
-  }
-  if (Entry.Icon == OsIcon::BlackArch) {
-    DrawBitmapLogo(Renderer, CenterX, Top, Unit, oslogos::kBlackArch, Color);
-    return;
-  }
-
-  const UINTN Size = 7U * Unit;
-  const UINTN X = CenterX - (Size / 2U);
-  const UINTN Thickness = AtLeastOne(Unit / 8U);
-  if (Entry.Icon == OsIcon::Windows) {
-    const UINTN Pane = 3U * Unit;
-    Renderer.FillRectangle(X, Top, Pane, Pane, Color);
-    Renderer.FillRectangle(X + (4U * Unit), Top, Pane, Pane, Color);
-    Renderer.FillRectangle(X, Top + (4U * Unit), Pane, Pane, Color);
-    Renderer.FillRectangle(
-        X + (4U * Unit), Top + (4U * Unit), Pane, Pane, Color);
-    return;
-  }
-
-  if (Entry.Icon == OsIcon::Linux) {
-    DrawShield(Renderer, X, Top, Size, Thickness, Color, TRUE);
-    return;
-  }
-
-  DrawBorder(Renderer, X, Top, Size, Size, Thickness, Color);
-  DrawCornerTrace(
-      Renderer, X, Top, Size, Size, 2U * Unit, Thickness, theme::kCyanCore);
-  DrawCenteredText(
-      Renderer,
-      "EFI",
-      CenterX,
-      Top + (3U * Unit),
-      AtLeastOne(Unit / 5U),
-      Color);
+  osidentity::Draw(
+      Renderer, Entry, CenterX, Top, 7U * Unit, Color);
 }
 
 void DrawCard(
@@ -474,10 +417,12 @@ void DrawCard(
     const UINTN Width,
     const UINTN Height,
     const UINTN Unit,
-    const BOOLEAN Focused) noexcept {
+    const BOOLEAN Focused,
+    const BOOLEAN Compact) noexcept {
   const UINTN Thickness = AtLeastOne(Unit / 8U);
   const UINTN CenterX = X + (Width / 2U);
-  const RgbColor Accent = Entry.Available ? theme::kCyan : theme::kRed;
+  const osidentity::Descriptor& Identity = osidentity::Resolve(Entry);
+  const RgbColor Accent = Entry.Available ? Identity.Accent : theme::kRed;
   const RgbColor QuietAccent = ScaleColor(Accent, 120U);
 
   if (Focused && (X >= (3U * Thickness)) && (Y >= (3U * Thickness))) {
@@ -491,7 +436,7 @@ void DrawCard(
           Height + (2U * Offset),
           Thickness,
           ScaleColor(
-              Entry.Available ? theme::kCyanGlow : theme::kRedGlow,
+              Entry.Available ? Accent : theme::kRedGlow,
               static_cast<UINT8>(150U / Layer)));
     }
   }
@@ -527,22 +472,23 @@ void DrawCard(
         Y,
         2U * Unit,
         2U * Thickness,
-        theme::kCyanCore);
+        Accent);
   }
 
+  const UINTN IconUnit = Compact ? AtLeastOne(Unit / 2U) : Unit;
   DrawEntryLogo(
       Renderer,
       Entry,
       CenterX,
-      Y + (4U * Unit),
-      Unit,
+      Y + ((Compact ? 2U : 4U) * Unit),
+      IconUnit,
       Focused ? Accent : QuietAccent);
   DrawCenteredText(
       Renderer,
       Entry.Name,
       CenterX,
-      Y + (15U * Unit),
-      AtLeastOne(Unit / 4U),
+      Y + ((Compact ? 8U : 15U) * Unit),
+      AtLeastOne(Unit / (Compact ? 5U : 4U)),
       Focused ? theme::kPrimaryText : theme::kSecondaryText);
 }
 
@@ -804,22 +750,14 @@ EFI_STATUS WorkspaceMenu::Render(
   const UINTN Unit = ResponsiveUnit(Renderer);
   const UINTN CanvasWidth = 92U * Unit;
   const UINTN CanvasX = (Renderer.Width() - CanvasWidth) / 2U;
-  const UINTN CardWidth = 40U * Unit;
-  const UINTN CardHeight = 23U * Unit;
-  const UINTN CardGap = 4U * Unit;
-  const UINTN CardsWidth = (2U * CardWidth) + CardGap;
-  const UINTN CardsX = (Renderer.Width() - CardsWidth) / 2U;
-  const UINTN CardY = 14U * Unit;
   const UINTN HeaderScale = AtLeastOne(Unit / 4U);
   const UINTN SmallScale = AtLeastOne(Unit / 8U);
   const UINTN TinyScale = AtLeastOne(Unit / 10U);
   const UINTN Thickness = AtLeastOne(Unit / 8U);
-  const UINTN VisibleStart = (FocusedIndex / 2U) * 2U;
-  const UINTN VisibleCount =
-      (Configuration.Count > VisibleStart)
-          ? (((Configuration.Count - VisibleStart) > 2U) ? 2U
-                                                         : (Configuration.Count - VisibleStart))
-          : 0U;
+  const CardPageLayout Layout =
+      CardLayout::Calculate(Configuration.Count, FocusedIndex);
+  const UINTN VisibleStart = Layout.VisibleStart;
+  const UINTN VisibleCount = Layout.VisibleCount;
 
   Renderer.BeginFrame(theme::kBackground);
   DrawGrid(Renderer, Unit);
@@ -895,35 +833,18 @@ EFI_STATUS WorkspaceMenu::Render(
       Unit,
       TRUE);
 
-  if (VisibleCount == 1U) {
+  for (UINTN LocalIndex = 0U; LocalIndex < VisibleCount; ++LocalIndex) {
+    const CardRectangle& Card = Layout.Cards[LocalIndex];
     DrawCard(
         Renderer,
-        Configuration.Entries[VisibleStart],
-        (Renderer.Width() - CardWidth) / 2U,
-        CardY,
-        CardWidth,
-        CardHeight,
+        Configuration.Entries[VisibleStart + LocalIndex],
+        Card.X,
+        Card.Y,
+        Card.Width,
+        Card.Height,
         Unit,
-        TRUE);
-  } else if (VisibleCount == 2U) {
-    DrawCard(
-        Renderer,
-        Configuration.Entries[VisibleStart],
-        CardsX,
-        CardY,
-        CardWidth,
-        CardHeight,
-        Unit,
-        (FocusedIndex == VisibleStart) ? TRUE : FALSE);
-    DrawCard(
-        Renderer,
-        Configuration.Entries[VisibleStart + 1U],
-        CardsX + CardWidth + CardGap,
-        CardY,
-        CardWidth,
-        CardHeight,
-        Unit,
-        (FocusedIndex == (VisibleStart + 1U)) ? TRUE : FALSE);
+        (FocusedIndex == (VisibleStart + LocalIndex)) ? TRUE : FALSE,
+        Layout.Compact);
   }
 
   if (Configuration.Count > 0U) {
