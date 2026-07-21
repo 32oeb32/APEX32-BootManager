@@ -137,8 +137,20 @@ if(APEX32_BUILD_DEB_PACKAGE)
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "APEX32 Secure contributors")
   set(CPACK_DEBIAN_PACKAGE_SECTION "admin")
   set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "efibootmgr, pkexec, util-linux")
-  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  # Ubuntu 24.04 applies the t64 suffix to every Qt 6 runtime package, while
+  # current Debian and Kali keep it only for QtCore. The shared-library SONAMEs
+  # are compatible, so express both valid package-name families explicitly.
+  # Automatic shlibdeps must remain disabled because it would append the
+  # Ubuntu-only names from the package build host and defeat the alternatives.
+  string(
+    CONCAT
+    CPACK_DEBIAN_PACKAGE_DEPENDS
+    "efibootmgr, pkexec, util-linux, libc6 (>= 2.34), libgcc-s1 (>= 3.0), "
+    "libstdc++6 (>= 5), "
+    "libqt6core6t64 (>= 6.4.0) | libqt6core6 (>= 6.4.0), "
+    "libqt6gui6t64 (>= 6.1.2) | libqt6gui6 (>= 6.1.2), "
+    "libqt6widgets6t64 (>= 6.1.2) | libqt6widgets6 (>= 6.1.2)")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
   set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
   set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://apex32-secure.com")
   include(CPack)

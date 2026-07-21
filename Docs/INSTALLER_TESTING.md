@@ -249,3 +249,9 @@ maintainer scripts. If the runner exposes an ESP or EFI variable filesystem,
 the test snapshots all paths, metadata, and file contents and requires the
 exact same snapshots after purge. It never launches the privileged install
 operation.
+
+Finally, the workflow installs the identical `.deb` inside an official Kali
+rolling container and runs the packaged GUI capability probe with Qt's
+offscreen platform. This verifies that Ubuntu's `t64` Qt names and
+Kali/Debian's mixed Qt package names both resolve without rebuilding or
+changing the artifact.

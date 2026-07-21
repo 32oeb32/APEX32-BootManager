@@ -74,6 +74,9 @@ choose **Install APEX32 and Make Default**, and finish. They will never copy EFI
 files or edit NVRAM by hand. See
 [Linux package and zero-terminal installation](Docs/LINUX_PACKAGE.md).
 
+The Debian-family release uses portable Qt dependency alternatives and CI
+installs the same package on both Ubuntu and Kali rolling before publication.
+
 There is no Windows installer in this alpha. The planned Windows release is a
 signed graphical package using the normal UAC consent dialog; Windows users
 will not be asked to clone the repository or use a terminal. See

@@ -75,6 +75,28 @@ jobs:
             "${packages[0]}" \
             Build/DEBUG_GCC/X64/Apex32BootManager.efi
 
+      - name: Install and launch the package on Kali rolling
+        shell: bash
+        run: |
+          mapfile -t packages < <(
+            find Installer/Linux/package-build/packages \
+              -maxdepth 1 -type f -name '*.deb' -print
+          )
+          test "${#packages[@]}" -eq 1
+          package="$(realpath "${packages[0]}")"
+          package_dir="$(dirname "${package}")"
+          package_name="$(basename "${package}")"
+          docker run --rm \
+            --volume "${package_dir}:/packages:ro" \
+            kalilinux/kali-rolling:latest \
+            bash -euxo pipefail -c '
+              apt-get update
+              apt-get install --yes --no-install-recommends "/packages/$1"
+              expected=$'"'"'APEX32CAPS|1\nSCAN|1\nINSTALL|1\nRESTORE|1\nTERMINAL_AUTH|0'"'"'
+              test "$(QT_QPA_PLATFORM=offscreen apex32-installer --capabilities)" = "${expected}"
+              apt-get purge --yes apex32-boot-manager
+            ' bash "${package_name}"
+
       - name: Publish the tested Debian package as a workflow artifact
         uses: actions/upload-artifact@v6
         with:

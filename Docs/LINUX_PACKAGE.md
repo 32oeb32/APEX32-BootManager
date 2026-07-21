@@ -57,8 +57,9 @@ temporary directory and verifies:
 - the firmware matches the verified EDK II output byte-for-byte;
 - only the package build reports `INSTALL|1` and `RESTORE|1`;
 - terminal authentication remains disabled; and
-- runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` in
-  addition to automatically detected shared-library dependencies.
+- runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` together
+  with portable Qt dependency alternatives for Ubuntu, Debian, and Kali
+  package naming.
 
 The GitHub package workflow then installs the package on a disposable runner,
 checks root ownership and capability mode, reinstalls it, purges it, and
@@ -67,6 +68,11 @@ outside GitHub Actions or where an APEX32 ESP path already exists. It rejects
 packages containing Debian maintainer scripts. When the hosted runner exposes
 an ESP or EFI variables, the test snapshots all paths, metadata, and file
 content before and after the lifecycle so any mutation fails the gate.
+
+The same workflow then installs the identical Ubuntu-built `.deb` inside an
+official Kali rolling container and launches its packaged capability probe.
+This keeps one Debian-family artifact while preventing build-host-specific Qt
+package names from reaching users again.
 
 The candidate remains unreleased until the hardware, multi-ESP, Secure Boot,
 recovery-media, and release-signing gates in
