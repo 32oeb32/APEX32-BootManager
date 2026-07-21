@@ -23,6 +23,18 @@
 - automatic dependency checks and graphical error recovery
 - QEMU/OVMF integration matrix for Windows, GRUB, shim, and systemd-boot
 
+Current beta foundation gates:
+
+- completed: transactional mock-ESP install, rollback, persistent recovery
+  state, restore, and idempotent reinstall;
+- completed: boot the real APEX32 EFI application under OVMF and validate its
+  captured GOP framebuffer;
+- next: seed and verify a private OVMF `Boot####` entry and default `BootOrder`;
+- next: exercise loader handoff with representative Windows and Linux test
+  images; and
+- next: package, install, update, restore, and uninstall entirely through the
+  desktop GUI.
+
 ## 1.0.0 — public stable
 
 - reproducible firmware and installer builds

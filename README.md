@@ -33,6 +33,8 @@ personal APEX32 installation or development tree.
 - an isolated mock-ESP transaction test covering verified staging,
   duplicate-free reinstall, immutable backup, automatic rollback, persistent
   recovery state, and full restore/uninstall semantics;
+- an OVMF visual gate that boots the real EFI application from a temporary
+  virtual ESP and verifies that the APEX32 gateway reaches the framebuffer;
 - a polkit-authorized helper design reserved for a future packaged installer
   that will install APEX32 without terminal commands; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
@@ -53,6 +55,12 @@ setup, expected test output, Hyprland graphical authorization setup, a safe GUI
 demo, and an authorized read-only scan of the real ESP. It deliberately stops
 before installation on hardware. The source build reports `INSTALL|0`, keeps
 the Install control disabled, and rejects direct helper install requests.
+
+The intended public experience remains: clone or install a package, open the
+graphical installer, select **Scan Now**, select **Make Default**, and finish.
+Those final controls stay disabled until the remaining hardware and package
+gates pass; no public user should be asked to copy EFI files or edit NVRAM by
+hand.
 
 There is no Windows installer in this alpha. The planned Windows release is a
 signed graphical package using the normal UAC consent dialog; Windows users
@@ -76,6 +84,14 @@ The EFI artifact is written to:
 ```text
 Build/DEBUG_GCC/X64/Apex32BootManager.efi
 ```
+
+The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
+
+```bash
+./Tools/test-qemu-ovmf.sh
+```
+
+See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).
 
 ## Configuration
 

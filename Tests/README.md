@@ -25,3 +25,13 @@ immutable first backup behavior, and fallback restoration.
 Host tests do not validate EDK II linkage, PE/COFF generation, real GOP
 hardware, firmware NVRAM behavior, Qt/polkit integration, or the final package.
 Those are separate release gates.
+
+After building `Apex32BootManager.efi`, run:
+
+```bash
+./Tools/test-qemu-ovmf.sh
+```
+
+This boots the real EFI application under QEMU/OVMF and validates a captured
+GOP framebuffer. It uses only a temporary virtual ESP and private OVMF variable
+store. See [QEMU/OVMF firmware testing](../Docs/QEMU_OVMF_TESTING.md).
