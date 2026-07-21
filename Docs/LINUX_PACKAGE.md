@@ -9,7 +9,8 @@ contributor workflows; release users do not need a terminal.
 1. Download `apex32-boot-manager_0.11.0~beta1_amd64.deb` from the official
    GitHub release linked by [apex32-secure.com](https://apex32-secure.com).
 2. Double-click the downloaded package and choose **Install** in the desktop
-   software application.
+   software application. The package includes AppStream metadata, a desktop
+   launcher, and a scalable APEX32 icon.
 3. Launch **APEX32 Community Installer** from the application menu.
 4. Open **Systems** and select **Scan Now**. The desktop displays its normal
    graphical administrator-password dialog if the ESP is protected.
@@ -51,12 +52,19 @@ temporary directory and verifies:
 
 - the GUI, helper, desktop launcher, icon, PolicyKit policy, firmware, GPL, and
   disclaimer are present;
+- the desktop entry and Software Center/AppStream metadata validate cleanly;
 - the installed helper path matches the PolicyKit policy;
 - the firmware matches the verified EDK II output byte-for-byte;
 - only the package build reports `INSTALL|1` and `RESTORE|1`;
 - terminal authentication remains disabled; and
 - runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` in
   addition to automatically detected shared-library dependencies.
+
+The GitHub package workflow then installs the package on a disposable runner,
+checks root ownership and capability mode, reinstalls it, purges it, and
+confirms every packaged path was removed. The lifecycle script refuses to run
+outside GitHub Actions or on any host exposing an ESP or UEFI variable
+filesystem.
 
 The candidate remains unreleased until the hardware, multi-ESP, Secure Boot,
 recovery-media, and release-signing gates in

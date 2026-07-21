@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.apex32secure.APEX32Installer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>APEX32 Community Installer</name>
+  <summary>Install and recover the APEX32 graphical UEFI boot manager</summary>
+  <description>
+    <p>
+      APEX32 Community Installer discovers compatible UEFI operating-system
+      loaders, creates a verified configuration, installs APEX32 Secure
+      Gateway, and promotes it to the default firmware boot entry.
+    </p>
+    <p>
+      Installation uses graphical PolicyKit authorization and preserves a
+      recovery state so the previous boot files and order can be restored.
+    </p>
+  </description>
+  <launchable type="desktop-id">apex32-installer.desktop</launchable>
+  <icon type="stock">apex32-installer</icon>
+  <provides>
+    <binary>apex32-installer</binary>
+  </provides>
+  <url type="homepage">https://apex32-secure.com</url>
+  <url type="bugtracker">https://github.com/32oeb32/APEX32-BootManager/issues</url>
+  <developer id="com.apex32secure">
+    <name>APEX32 Secure contributors</name>
+  </developer>
+  <releases>
+    <release version="0.11.0-beta1" date="2026-07-21">
+      <description>
+        <p>First transaction-protected Debian package candidate.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

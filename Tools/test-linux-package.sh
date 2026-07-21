@@ -13,7 +13,7 @@ fi
 
 package="$(realpath "$1")"
 expected_firmware="${2:-}"
-for program in cmp dpkg-deb find grep od realpath stat tr; do
+for program in appstreamcli cmp desktop-file-validate dpkg-deb find grep od realpath stat tr; do
   command -v "${program}" >/dev/null 2>&1 || {
     echo "FAIL: missing package test dependency: ${program}" >&2
     exit 2
@@ -32,6 +32,7 @@ firmware="${root}/usr/share/apex32/Apex32BootManager.efi"
 desktop="${root}/usr/share/applications/apex32-installer.desktop"
 policy="${root}/usr/share/polkit-1/actions/org.apex32secure.installer.policy"
 icon="${root}/usr/share/icons/hicolor/scalable/apps/apex32-installer.svg"
+metainfo="${root}/usr/share/metainfo/com.apex32secure.APEX32Installer.metainfo.xml"
 
 for required in \
   "${gui}" \
@@ -40,6 +41,7 @@ for required in \
   "${desktop}" \
   "${policy}" \
   "${icon}" \
+  "${metainfo}" \
   "${root}/usr/share/doc/apex32-boot-manager/LICENSE" \
   "${root}/usr/share/doc/apex32-boot-manager/DISCLAIMER.md"; do
   [[ -f "${required}" ]] || {
@@ -78,10 +80,13 @@ actual_capabilities="$("${gui}" --capabilities)"
 }
 
 grep -qx 'Exec=apex32-installer' "${desktop}"
+grep -qx 'TryExec=apex32-installer' "${desktop}"
 grep -qx 'Icon=apex32-installer' "${desktop}"
 grep -qx 'Terminal=false' "${desktop}"
 grep -q '/usr/libexec/apex32/apex32-installer-helper' "${policy}"
 grep -q 'org.freedesktop.policykit.exec.allow_gui' "${policy}"
+desktop-file-validate "${desktop}"
+appstreamcli validate --no-net "${metainfo}"
 
 depends="$(dpkg-deb --field "${package}" Depends)"
 for dependency in efibootmgr pkexec util-linux; do
@@ -91,6 +96,6 @@ for dependency in efibootmgr pkexec util-linux; do
   }
 done
 
-echo "PASS: Debian package contains GUI, helper, policy, icon, firmware, and recovery documentation"
+echo "PASS: Debian package contains GUI, helper, policy, desktop/AppStream metadata, icon, firmware, and recovery documentation"
 echo "PASS: packaged GUI reports INSTALL|1, RESTORE|1, and terminal authorization disabled"
 echo "PASS: package metadata declares the required EFI and graphical authorization tools"

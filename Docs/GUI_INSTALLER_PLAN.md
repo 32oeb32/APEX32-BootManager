@@ -49,6 +49,8 @@ will not be reused as a shortcut.
   GRUB, and shim execution gates.
 - Completed: reproducible package layout and capability inspection without
   installing the package on the CI host.
+- Completed: install, reinstall, desktop/AppStream validation, and purge on a
+  disposable CI runner that refuses hosts with an ESP or EFI variables.
 - Multi-disk and multi-ESP discovery with explicit device identity.
 - Live-hardware install, reboot, reinstall, restore, and independent recovery
   validation on the release machine matrix.

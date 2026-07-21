@@ -62,3 +62,6 @@ The Debian package has its own isolated gate:
 It extracts rather than installs the package and verifies the installed file
 layout, executable modes, desktop integration, PolicyKit path, declared runtime
 dependencies, install/restore capability flags, and byte-identical firmware.
+The `linux-package` workflow then runs the CI-confined package lifecycle test,
+which installs, reinstalls, and purges the candidate only on a disposable
+runner with no ESP or UEFI variable filesystem.

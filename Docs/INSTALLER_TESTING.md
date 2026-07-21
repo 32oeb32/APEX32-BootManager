@@ -240,3 +240,9 @@ install anything, invoke PolicyKit, touch the real ESP, or change NVRAM. It
 requires the packaged GUI to report `INSTALL|1`, `RESTORE|1`, and
 `TERMINAL_AUTH|0`, and byte-compares the packaged firmware with the verified
 EDK II artifact.
+
+CI follows that inspection with `Tools/test-linux-package-lifecycle.sh`. This
+second test performs a real package-manager install, reinstall, and purge only
+on a disposable GitHub runner. It refuses local execution, a mounted
+`/boot/efi`, or an EFI variable filesystem. It never launches the privileged
+install operation.

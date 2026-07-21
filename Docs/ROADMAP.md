@@ -40,6 +40,9 @@ Current beta foundation gates:
   artifact, extract it without root, and verify its complete payload,
   dependency metadata, firmware identity, and `INSTALL|1` / `RESTORE|1`
   capability mode;
+- automated gate: install, reinstall, and purge the package on a disposable
+  runner, validate desktop/AppStream integration and protected ownership, and
+  prove that package management does not touch an ESP or UEFI variables;
 - next: exercise systemd-boot and a user-supplied Windows recovery image; and
 - next: install, update, restore, and remove the package through the desktop
   GUI on the live-hardware qualification matrix.

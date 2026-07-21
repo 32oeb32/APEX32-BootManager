@@ -89,6 +89,9 @@ install(
   FILES apex32-installer.desktop
   DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
 install(
+  FILES com.apex32secure.APEX32Installer.metainfo.xml
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo")
+install(
   FILES apex32-installer.svg
   DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
 install(

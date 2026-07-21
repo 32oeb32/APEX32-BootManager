@@ -43,6 +43,8 @@ adds:
   the only build mode that reports `INSTALL|1` and `RESTORE|1`;
 - an extracted-package CI gate covering the GUI, helper, firmware, desktop
   launcher, icon, PolicyKit policy, dependencies, and capability mode;
+- a disposable-runner lifecycle gate that performs a real package install,
+  reinstall, and purge while refusing access to any ESP or UEFI variables;
 - real OVMF gates for removable fallback, NVRAM-first boot, Linux and Windows
   handoffs, GRUB, and shim; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
