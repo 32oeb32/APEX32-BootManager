@@ -97,9 +97,27 @@ jobs:
               apt-get purge --yes apex32-boot-manager
             ' bash "${package_name}"
 
+      - name: Prepare stable one-command release assets
+        shell: bash
+        run: |
+          mapfile -t packages < <(
+            find Installer/Linux/package-build/packages \
+              -maxdepth 1 -type f -name '*.deb' -print
+          )
+          test "${#packages[@]}" -eq 1
+          mkdir -p Installer/Linux/package-build/release
+          cp -- "${packages[0]}" \
+            Installer/Linux/package-build/release/apex32-boot-manager_amd64.deb
+          cd Installer/Linux/package-build/release
+          sha256sum apex32-boot-manager_amd64.deb \
+            > apex32-boot-manager_amd64.deb.sha256
+
       - name: Publish the tested Debian package as a workflow artifact
         uses: actions/upload-artifact@v6
         with:
           name: apex32-boot-manager_0.11.0-beta1_amd64
-          path: Installer/Linux/package-build/packages/*.deb
+          path: |
+            Installer/Linux/package-build/packages/*.deb
+            Installer/Linux/package-build/release/apex32-boot-manager_amd64.deb
+            Installer/Linux/package-build/release/apex32-boot-manager_amd64.deb.sha256
           if-no-files-found: error

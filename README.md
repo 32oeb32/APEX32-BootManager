@@ -18,9 +18,8 @@ personal APEX32 installation or development tree.
 
 ## Status
 
-`0.10.0-alpha1` is the published source milestone. The
-`installer/authorized-scan` branch is now the `0.11.0-beta1` candidate and
-adds:
+`0.10.0-alpha1` is the published source milestone. The merged
+`0.11.0-beta1` foundation and current one-step installer candidate add:
 
 - the hardware-tested APEX32 intro and resolution-independent GOP renderer;
 - a generic configuration parser supporting up to eight UEFI loaders;
@@ -77,9 +76,27 @@ files or edit NVRAM by hand. See
 The Debian-family release uses portable Qt dependency alternatives and CI
 installs the same package on both Ubuntu and Kali rolling before publication.
 
-There is no Windows installer in this alpha. The planned Windows release is a
-signed graphical package using the normal UAC consent dialog; Windows users
-will not be asked to clone the repository or use a terminal. See
+## One-step user installation
+
+Linux technical users run one command after choosing a trusted release:
+
+```bash
+git clone https://github.com/32oeb32/APEX32-BootManager.git && cd APEX32-BootManager && ./install.sh
+```
+
+The launcher downloads and verifies the tested package, requests graphical
+PolicyKit authorization, installs it, and opens the GUI. It never builds EDK II
+or asks the user to copy EFI files or edit firmware variables.
+
+Windows users will download and double-click one
+`APEX32-Community-Setup.exe`. The current Windows package is a read-only scan
+preview and keeps boot installation disabled until native rollback and real
+hardware qualification pass. See
+[one-step installation](Docs/ONE_STEP_INSTALL.md).
+
+The Windows scan-preview package uses the normal UAC consent dialog. Its
+transactional install/default/restore backend is not enabled yet; Windows
+users will not be asked to clone the repository or use a terminal. See the
 [GUI installer release plan](Docs/GUI_INSTALLER_PLAN.md).
 
 ## Build the firmware

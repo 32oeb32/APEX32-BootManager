@@ -6,8 +6,18 @@ contributor workflows; release users do not need a terminal.
 
 ## Release-user experience
 
-1. Download `apex32-boot-manager_0.11.0~beta1_amd64.deb` from the official
-   GitHub release linked by [apex32-secure.com](https://apex32-secure.com).
+Technical users may clone and launch the verified package flow with one
+command:
+
+```bash
+git clone https://github.com/32oeb32/APEX32-BootManager.git && cd APEX32-BootManager && ./install.sh
+```
+
+Desktop-only users can instead download
+`apex32-boot-manager_amd64.deb` from the official GitHub release linked by
+[apex32-secure.com](https://apex32-secure.com).
+
+1. Download `apex32-boot-manager_amd64.deb` or run the one-command launcher.
 2. Double-click the downloaded package and choose **Install** in the desktop
    software application. The package includes AppStream metadata, a desktop
    launcher, and a scalable APEX32 icon.
@@ -23,6 +33,11 @@ contributor workflows; release users do not need a terminal.
 
 No terminal, manual ESP selection, file copying, `efibootmgr`, GRUB editing, or
 rEFInd is part of the release-user workflow.
+
+The launcher requires the release's matching `.sha256` asset and refuses to
+install when it is missing or invalid. It uses `pkexec --disable-internal-agent`
+so administrator approval is graphical and cannot fall back to a terminal
+password prompt.
 
 ## Recovery and removal
 
