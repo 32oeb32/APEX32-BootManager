@@ -18,7 +18,9 @@ personal APEX32 installation or development tree.
 
 ## Status
 
-`0.10.0-alpha1` is the first public-source architecture milestone. It includes:
+`0.10.0-alpha1` is the published source milestone. The
+`installer/authorized-scan` branch is now the `0.11.0-beta1` candidate and
+adds:
 
 - the hardware-tested APEX32 intro and resolution-independent GOP renderer;
 - a generic configuration parser supporting up to eight UEFI loaders;
@@ -36,12 +38,17 @@ personal APEX32 installation or development tree.
 - an OVMF visual gate that boots the real EFI application from a temporary
   virtual ESP, then seeds a private APEX32 `Boot####` entry, promotes it to
   first in `BootOrder`, reboots, and verifies the gateway framebuffer;
-- a polkit-authorized helper design reserved for a future packaged installer
-  that will install APEX32 without terminal commands; and
+- a transactional polkit-authorized install and restore helper;
+- a Debian package builder that embeds the verified EFI application and is
+  the only build mode that reports `INSTALL|1` and `RESTORE|1`;
+- an extracted-package CI gate covering the GUI, helper, firmware, desktop
+  launcher, icon, PolicyKit policy, dependencies, and capability mode;
+- real OVMF gates for removable fallback, NVRAM-first boot, Linux and Windows
+  handoffs, GRUB, and shim; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
   management, and recovery fallback behavior.
 
-This is an alpha source milestone, not yet a universal production installer.
+This is a beta candidate, not yet a universal production installer.
 The current firmware executes loaders located on its own EFI System Partition.
 Multi-ESP device resolution, signed release artifacts, distro packages, and
 the completed recovery GUI remain release gates.
@@ -57,11 +64,13 @@ demo, and an authorized read-only scan of the real ESP. It deliberately stops
 before installation on hardware. The source build reports `INSTALL|0`, keeps
 the Install control disabled, and rejects direct helper install requests.
 
-The intended public experience remains: clone or install a package, open the
-graphical installer, select **Scan Now**, select **Make Default**, and finish.
-Those final controls stay disabled until the remaining hardware and package
-gates pass; no public user should be asked to copy EFI files or edit NVRAM by
-hand.
+The tested Debian package candidate enables the final controls. It is not a
+public release until live-hardware restore, multi-ESP selection, Secure Boot,
+and release-signing gates pass. End users will download the release package,
+open it graphically, launch APEX32, select **Scan Now**, select their systems,
+choose **Install APEX32 and Make Default**, and finish. They will never copy EFI
+files or edit NVRAM by hand. See
+[Linux package and zero-terminal installation](Docs/LINUX_PACKAGE.md).
 
 There is no Windows installer in this alpha. The planned Windows release is a
 signed graphical package using the normal UAC consent dialog; Windows users
@@ -96,6 +105,23 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 ```
 
 See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).
+
+## Build the Debian beta package
+
+After building the verified EFI application, contributors can produce and
+inspect the same hardware-enabled package used by CI:
+
+```bash
+./Tools/build-linux-package.sh
+
+PACKAGE="$(find Installer/Linux/package-build/packages -name '*.deb' -print -quit)"
+./Tools/test-linux-package.sh \
+  "$PACKAGE" \
+  Build/DEBUG_GCC/X64/Apex32BootManager.efi
+```
+
+These are contributor commands. Release users install the `.deb` from their
+desktop without opening a terminal.
 
 ## Configuration
 

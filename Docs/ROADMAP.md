@@ -36,9 +36,13 @@ Current beta foundation gates:
 - automated gate: launch a real embedded-config GRUB image both directly and
   through the distribution's packaged shim, then require GRUB to chainload the
   isolated signature payload;
+- completed: build a hardware-enabled Debian package from the verified EFI
+  artifact, extract it without root, and verify its complete payload,
+  dependency metadata, firmware identity, and `INSTALL|1` / `RESTORE|1`
+  capability mode;
 - next: exercise systemd-boot and a user-supplied Windows recovery image; and
-- next: package, install, update, restore, and uninstall entirely through the
-  desktop GUI.
+- next: install, update, restore, and remove the package through the desktop
+  GUI on the live-hardware qualification matrix.
 
 ## 1.0.0 — public stable
 

@@ -9,9 +9,9 @@ desktop GUI into a permanently privileged process.
 - Default source builds define `APEX32_ENABLE_HARDWARE_INSTALL=OFF`. The GUI
   disables installation and the helper compiles out every mutating function.
 - A direct `install` helper request is rejected before privilege or file checks.
-- A future hardware-tested package may opt in at build time and must bundle an
-  existing, verified firmware artifact; CMake otherwise fails configuration.
-- Installation in such a future package invokes one fixed helper through polkit.
+- The beta package candidate opts in at build time and must bundle an existing,
+  verified firmware artifact; CMake otherwise fails configuration.
+- Installation in that package invokes one fixed helper through polkit.
 - The GUI passes `--disable-internal-agent` to `pkexec`, so authentication may
   use only the desktop's graphical PolicyKit agent and can never fall back to
   a terminal password prompt.
@@ -20,9 +20,9 @@ desktop GUI into a permanently privileged process.
 - External programs are called with argument arrays through `QProcess`; no
   shell command string is constructed.
 - The first existing APEX32 firmware file is preserved before replacement.
-- A stable release must add GUI-tested restore and uninstall operations.
+- A stable release requires live-hardware GUI restore qualification.
 
-The experimental, default-off install implementation depends on `findmnt`,
+The default-off install implementation depends on `findmnt`,
 `lsblk`, and `efibootmgr` at fixed `/usr/bin` paths. Packaging must declare and
 verify these dependencies before enabling it.
 
@@ -38,7 +38,7 @@ paths and cannot write files or firmware variables. Multi-ESP enumeration is
 still required before beta.
 
 The GUI exposes a machine-readable `--capabilities` response. CI requires
-`SCAN|1`, `INSTALL|0`, and `TERMINAL_AUTH|0` for the public alpha. This makes an
+`SCAN|1`, `INSTALL|0`, and `TERMINAL_AUTH|0` for ordinary source builds. This makes an
 accidental build-mode regression visible before release.
 
 ## Transaction test isolation
@@ -54,6 +54,12 @@ The transaction test covers staged SHA-256 verification, current-file
 snapshots, immutable original backups, persistent pre-install state,
 duplicate-free reinstall, post-install verification, rollback after an
 injected boot-order failure, an injected restore failure, and complete restore
-of files, boot order, and firmware-entry ownership. The public helper remains
-scan-only while this foundation is reviewed and extended with QEMU/OVMF
-coverage.
+of files, boot order, and firmware-entry ownership. Ordinary source builds
+remain scan-only.
+
+The Debian package workflow is deliberately separate. It must embed the
+verified PE/COFF firmware and its extracted GUI must report `INSTALL|1`,
+`RESTORE|1`, and `TERMINAL_AUTH|0`. The production helper accepts firmware only
+from the root-owned packaged path and accepts configuration only from a private
+installer-generated temporary file owned by the authenticated desktop user.
+Every configuration entry is validated again before privileged mutation.

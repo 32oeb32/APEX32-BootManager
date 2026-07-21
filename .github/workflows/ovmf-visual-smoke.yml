@@ -11,7 +11,7 @@ jobs:
   boot-real-efi-under-ovmf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install EDK II and virtualization dependencies
         run: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Preserve the framebuffer when the gate fails
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: apex32-ovmf-failure-framebuffer
           path: ${{ runner.temp }}/apex32-ovmf-*.ppm

@@ -20,6 +20,53 @@
 
 namespace {
 
+constexpr auto kInstalledFirmwarePath =
+    "/usr/share/apex32/Apex32BootManager.efi";
+
+[[nodiscard]] bool ValidateConfiguration(
+    const QByteArray& Data,
+    QString* Error) {
+  const QList<QByteArray> Lines = Data.split('\n');
+  if (Lines.isEmpty() || Lines.first().trimmed() != "APEX32CFG|1") {
+    *Error = QStringLiteral("configuration header is invalid");
+    return false;
+  }
+
+  int Entries = 0;
+  const QList<QByteArray> AllowedIcons = {
+      "generic", "linux", "windows", "kali", "blackarch"};
+  for (qsizetype Index = 1; Index < Lines.size(); ++Index) {
+    const QByteArray Line = Lines.at(Index).trimmed();
+    if (Line.isEmpty()) {
+      continue;
+    }
+    const QList<QByteArray> Fields = Line.split('|');
+    if (Fields.size() != 4 || Fields.at(0) != "ENTRY" ||
+        Fields.at(1).isEmpty() || Fields.at(1).size() > 80 ||
+        !Fields.at(2).startsWith("\\EFI\\") ||
+        !Fields.at(2).toLower().endsWith(".efi") ||
+        Fields.at(2).size() > 512 || Fields.at(2).contains("..") ||
+        Fields.at(2).contains('/') ||
+        !AllowedIcons.contains(Fields.at(3))) {
+      *Error = QStringLiteral("configuration entry is invalid");
+      return false;
+    }
+    for (const char Character : Fields.at(1)) {
+      const unsigned char Value = static_cast<unsigned char>(Character);
+      if (Value < 0x20 || Value > 0x7e) {
+        *Error = QStringLiteral("configuration name is invalid");
+        return false;
+      }
+    }
+    ++Entries;
+  }
+  if (Entries < 1 || Entries > 8) {
+    *Error = QStringLiteral("configuration must contain one to eight entries");
+    return false;
+  }
+  return true;
+}
+
 [[nodiscard]] bool RequireRoot(QString* Error) {
   if (geteuid() == 0) {
     return true;
@@ -405,6 +452,38 @@ void RollBack(
     *Error = QStringLiteral("firmware or configuration source is missing");
     return false;
   }
+#if !defined(APEX32_TRANSACTION_TEST)
+  const QString InstalledFirmware = QFileInfo(
+      QString::fromUtf8(kInstalledFirmwarePath)).canonicalFilePath();
+  if (InstalledFirmware.isEmpty() ||
+      FirmwareInfo.canonicalFilePath() != InstalledFirmware ||
+      FirmwareInfo.ownerId() != 0 ||
+      (FirmwareInfo.permissions() &
+       (QFileDevice::WriteGroup | QFileDevice::WriteOther)) !=
+          QFileDevice::Permissions()) {
+    *Error = QStringLiteral(
+        "firmware source is not the protected packaged APEX32 image");
+    return false;
+  }
+
+  bool UidValid = false;
+  const uint InvokingUid = qEnvironmentVariable("PKEXEC_UID").toUInt(&UidValid);
+  const QFileDevice::Permissions UnsafeConfigPermissions =
+      QFileDevice::ReadGroup | QFileDevice::WriteGroup |
+      QFileDevice::ExeGroup | QFileDevice::ReadOther |
+      QFileDevice::WriteOther | QFileDevice::ExeOther;
+  const QString ConfigPath = ConfigInfo.canonicalFilePath();
+  if (!UidValid || ConfigPath.isEmpty() ||
+      !ConfigPath.startsWith(QStringLiteral("/tmp/apex32-config-")) ||
+      !ConfigPath.endsWith(QStringLiteral(".cfg")) ||
+      ConfigInfo.ownerId() != InvokingUid ||
+      (ConfigInfo.permissions() & UnsafeConfigPermissions) !=
+          QFileDevice::Permissions()) {
+    *Error = QStringLiteral(
+        "configuration source is not a private installer-generated file");
+    return false;
+  }
+#endif
   if (FirmwareInfo.size() < 2 || FirmwareInfo.size() > (64 * 1024 * 1024) ||
       ConfigInfo.size() < 11 || ConfigInfo.size() > (64 * 1024)) {
     *Error = QStringLiteral("firmware or configuration size is invalid");
@@ -414,9 +493,12 @@ void RollBack(
   QFile ConfigFile(ConfigInfo.canonicalFilePath());
   if (!FirmwareFile.open(QIODevice::ReadOnly) ||
       FirmwareFile.read(2) != QByteArray("MZ", 2) ||
-      !ConfigFile.open(QIODevice::ReadOnly) ||
-      !ConfigFile.readLine(32).startsWith("APEX32CFG|1")) {
+      !ConfigFile.open(QIODevice::ReadOnly)) {
     *Error = QStringLiteral("firmware or configuration format is invalid");
+    return false;
+  }
+  const QByteArray ConfigurationData = ConfigFile.readAll();
+  if (!ValidateConfiguration(ConfigurationData, Error)) {
     return false;
   }
 

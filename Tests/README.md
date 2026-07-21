@@ -50,3 +50,15 @@ distribution package, first launches GRUB directly through APEX32, then
 launches the packaged shim which in turn starts GRUB. Both paths must chainload
 the isolated framebuffer-signature payload. Neither GRUB nor shim is stored in
 this repository.
+
+The Debian package has its own isolated gate:
+
+```bash
+./Tools/test-linux-package.sh \
+  Installer/Linux/package-build/packages/apex32-boot-manager_0.11.0~beta1_amd64.deb \
+  Build/DEBUG_GCC/X64/Apex32BootManager.efi
+```
+
+It extracts rather than installs the package and verifies the installed file
+layout, executable modes, desktop integration, PolicyKit path, declared runtime
+dependencies, install/restore capability flags, and byte-identical firmware.

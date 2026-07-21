@@ -3,6 +3,6 @@ Type=Application
 Name=APEX32 Community Installer
 Comment=Discover operating systems and install APEX32 Secure Gateway
 Exec=apex32-installer
-Icon=computer
+Icon=apex32-installer
 Categories=System;Settings;
 Terminal=false

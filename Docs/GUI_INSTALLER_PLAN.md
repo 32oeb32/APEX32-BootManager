@@ -3,12 +3,15 @@
 The APEX32 end-user installer must behave like a normal desktop application.
 Cloning, compiling, and terminal commands are contributor workflows only.
 
-## Current public alpha
+## Published alpha and beta candidate
 
 - Linux Qt GUI for safe loader discovery and preview.
 - Read-only ESP scan through a narrow PolicyKit helper when required.
 - Graphical authorization only; `pkexec` terminal fallback is disabled.
-- Hardware installation compiled out by default in both GUI and helper.
+- Source builds keep hardware installation compiled out in both GUI and
+  helper.
+- The CI-built Debian beta package is the only build mode that embeds verified
+  firmware and enables `INSTALL|1` and `RESTORE|1`.
 - No Windows installer is published yet.
 
 ## Linux beta experience
@@ -36,25 +39,38 @@ Cloning, compiling, and terminal commands are contributor workflows only.
 Windows support requires a native backend; the Linux helper and PolicyKit code
 will not be reused as a shortcut.
 
-## Release gates before enabling Install
+## Release gates
 
-- Transactional ESP staging, verification, commit, and automatic rollback.
-- Restore and uninstall buttons tested from the GUI.
+- Completed: transactional ESP staging, verification, commit, and automatic
+  rollback.
+- Completed: persistent recovery state and full restore behavior in confined
+  transaction tests.
+- Completed: real OVMF fallback, NVRAM-first boot, Linux/Windows handoff,
+  GRUB, and shim execution gates.
+- Completed: reproducible package layout and capability inspection without
+  installing the package on the CI host.
 - Multi-disk and multi-ESP discovery with explicit device identity.
-- QEMU/OVMF destructive integration tests and power-loss simulations.
+- Live-hardware install, reboot, reinstall, restore, and independent recovery
+  validation on the release machine matrix.
+- Power-loss simulations at each committed transaction boundary.
 - Signed firmware and signed Linux/Windows packages with reproducible hashes.
 - Secure Boot behavior documented and tested.
 - Recovery media instructions and a verified independent fallback path.
 - CI assertion that release artifacts contain the intended capability mode.
 
-Until all gates pass, the public build must continue to report `INSTALL|0`.
+Until the remaining gates pass, source builds continue to report `INSTALL|0`.
+Only the tested package candidate may report `INSTALL|1`; it must not be
+published as a stable release yet.
 
 ### Implemented beta foundation
 
-The source tree now contains a CI-only transaction helper that tests staged
+The source tree contains a CI-only transaction helper that tests staged
 copying, SHA-256 verification, immutable backups, persistent recovery state,
 reinstall without duplicate entries, automatic rollback after simulated
 firmware failure, and full restore/uninstall semantics. The GUI recovery action
-is present but compile-time disabled in public builds. The test helper is not
-installed and cannot target the real ESP. Remaining gates are QEMU/OVMF boot
-verification, package signing, and hardware qualification.
+is present but compile-time disabled in source builds. The test helper is not
+installed and cannot target the real ESP. A separate package workflow embeds
+the real EDK II output, enables the production helper, extracts the `.deb`
+without root, and verifies all payloads and dependencies. Remaining gates are
+live hardware, multi-ESP identity, Secure Boot, recovery media, and release
+signing.

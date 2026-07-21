@@ -104,8 +104,8 @@ The same script builds a separate, non-installed transaction-test helper. That
 binary is compile-time restricted to one explicitly declared temporary ESP
 under `/tmp`. It exercises installation and reinstall, then injects a simulated
 firmware boot-order failure and verifies automatic restoration of files, boot
-order, and any newly created APEX32 entry. The normal public helper remains
-compiled with `INSTALL|0`.
+order, and any newly created APEX32 entry. The normal source-built helper
+remains compiled with `INSTALL|0`.
 
 ## 4. Inspect the safe GUI demo
 
@@ -206,11 +206,11 @@ APEX32 source tree.
 
 ## Privileged installation phase
 
-The default source build rejects the alpha helper's `install` operation even
-when invoked directly. Do not bypass the compile-time gate. Transactional
-rollback, GUI restore/uninstall, distribution packaging, signed artifacts, and
-QEMU/OVMF destructive integration tests must pass before hardware installation
-is offered in an end-user package.
+The default source build rejects the helper's `install` operation even when
+invoked directly. Do not bypass the compile-time gate. Only the package builder
+may enable installation, and the resulting candidate remains unreleased until
+live-hardware restore, multi-ESP, Secure Boot, recovery-media, and signing gates
+pass.
 
 ## End-user packages and Windows
 
@@ -220,3 +220,23 @@ desktop PolicyKit dialog. The planned Windows beta will be a signed MSI or EXE
 that uses the standard UAC consent dialog. Neither packaged flow will require a
 terminal. Current Windows users should not attempt to install this alpha from
 source; a Windows installer has not been released.
+
+## Debian package candidate
+
+After the real firmware has been built, contributors can create the candidate
+without root:
+
+```bash
+./Tools/build-linux-package.sh
+
+PACKAGE="$(find Installer/Linux/package-build/packages -name '*.deb' -print -quit)"
+./Tools/test-linux-package.sh \
+  "$PACKAGE" \
+  Build/DEBUG_GCC/X64/Apex32BootManager.efi
+```
+
+The package test extracts the `.deb` into a temporary directory. It does not
+install anything, invoke PolicyKit, touch the real ESP, or change NVRAM. It
+requires the packaged GUI to report `INSTALL|1`, `RESTORE|1`, and
+`TERMINAL_AUTH|0`, and byte-compares the packaged firmware with the verified
+EDK II artifact.

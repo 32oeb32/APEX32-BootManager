@@ -581,6 +581,7 @@ class InstallerWindow final : public QWidget {
     auto* Layout = new QVBoxLayout(Tab);
     auto* Text = new QLabel(QStringLiteral(
         "APEX32 Boot Manager Community Edition\n\n"
+        "Linux installer 0.11.0 beta candidate\n\n"
         "Copyright (C) 2026 Oussama / APEX32 Secure\n"
         "Licensed under GNU GPL version 3.\n\n"
         "Project and documentation: https://apex32-secure.com"));
