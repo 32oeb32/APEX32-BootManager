@@ -1,0 +1,24 @@
+## @file
+# Test-only UEFI application that marks a successful Linux-path handoff.
+##
+
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = OvmfLinuxHandoffTarget
+  FILE_GUID      = CBBFC0FB-8330-4400-A692-E94D02A5FE9E
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.11.0
+  ENTRY_POINT    = UefiMain
+
+[Sources]
+  OvmfLinuxHandoffTarget.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid

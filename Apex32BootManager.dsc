@@ -26,9 +26,13 @@
   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
   UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
   UefiBootServicesTableLib|MdePkg/Library/UefiBootServicesTableLib/UefiBootServicesTableLib.inf
+  UefiRuntimeServicesTableLib|MdePkg/Library/UefiRuntimeServicesTableLib/UefiRuntimeServicesTableLib.inf
 
 [Components]
   APEX32-BootManager/Apex32BootManager.inf
+  APEX32-BootManager/Tests/OvmfBootOrderSeeder.inf
+  APEX32-BootManager/Tests/OvmfLinuxHandoffTarget.inf
+  APEX32-BootManager/Tests/OvmfWindowsHandoffTarget.inf
 
 [BuildOptions]
   GCC:*_*_X64_CXX_FLAGS = -std=c++20 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit

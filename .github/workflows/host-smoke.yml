@@ -11,6 +11,17 @@ jobs:
   sanitized-host-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run sanitized firmware and lifecycle tests
         run: ./Tools/test-host.sh
+
+  regular-user-installer-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Qt installer build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes cmake ninja-build qt6-base-dev
+      - name: Build and test the installer without root
+        run: ./Tools/test-installer-user.sh

@@ -1,0 +1,83 @@
+name: linux-package
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-inspect-debian-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install firmware and package build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            appstream \
+            build-essential \
+            cmake \
+            desktop-file-utils \
+            dpkg-dev \
+            file \
+            git \
+            iasl \
+            nasm \
+            ninja-build \
+            pkg-config \
+            python3 \
+            qt6-base-dev \
+            uuid-dev
+
+      - name: Check out the pinned EDK II revision
+        shell: bash
+        run: |
+          source Tools/edk2-version
+          git clone --depth 1 --branch "${EDK2_TAG}" \
+            https://github.com/tianocore/edk2.git \
+            "${RUNNER_TEMP}/edk2"
+          test "$(git -C "${RUNNER_TEMP}/edk2" rev-parse HEAD)" = "${EDK2_COMMIT}"
+          git -C "${RUNNER_TEMP}/edk2" submodule update --init --depth 1 \
+            BaseTools/Source/C/BrotliCompress/brotli \
+            MdePkg/Library/BaseFdtLib/libfdt \
+            MdePkg/Library/MipiSysTLib/mipisyst
+
+      - name: Build the verified APEX32 firmware
+        run: EDK2_DIR="${RUNNER_TEMP}/edk2" ./Tools/build-edk2.sh
+
+      - name: Build the hardware-enabled Debian package
+        run: ./Tools/build-linux-package.sh
+
+      - name: Inspect the package without installing it
+        shell: bash
+        run: |
+          mapfile -t packages < <(
+            find Installer/Linux/package-build/packages \
+              -maxdepth 1 -type f -name '*.deb' -print
+          )
+          test "${#packages[@]}" -eq 1
+          ./Tools/test-linux-package.sh \
+            "${packages[0]}" \
+            Build/DEBUG_GCC/X64/Apex32BootManager.efi
+
+      - name: Install, reinstall, and purge on the disposable runner
+        shell: bash
+        run: |
+          mapfile -t packages < <(
+            find Installer/Linux/package-build/packages \
+              -maxdepth 1 -type f -name '*.deb' -print
+          )
+          test "${#packages[@]}" -eq 1
+          ./Tools/test-linux-package-lifecycle.sh \
+            "${packages[0]}" \
+            Build/DEBUG_GCC/X64/Apex32BootManager.efi
+
+      - name: Publish the tested Debian package as a workflow artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: apex32-boot-manager_0.11.0-beta1_amd64
+          path: Installer/Linux/package-build/packages/*.deb
+          if-no-files-found: error

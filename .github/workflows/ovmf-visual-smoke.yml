@@ -1,0 +1,73 @@
+name: ovmf-visual-smoke
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  boot-real-efi-under-ovmf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install EDK II and virtualization dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            git \
+            grub-efi-amd64-bin \
+            iasl \
+            nasm \
+            ovmf \
+            python3 \
+            qemu-system-x86 \
+            shim-signed \
+            uuid-dev
+
+      - name: Check out the pinned EDK II revision
+        shell: bash
+        run: |
+          source Tools/edk2-version
+          git clone --depth 1 --branch "${EDK2_TAG}" \
+            https://github.com/tianocore/edk2.git \
+            "${RUNNER_TEMP}/edk2"
+          test "$(git -C "${RUNNER_TEMP}/edk2" rev-parse HEAD)" = "${EDK2_COMMIT}"
+          git -C "${RUNNER_TEMP}/edk2" submodule update --init --depth 1 \
+            BaseTools/Source/C/BrotliCompress/brotli \
+            MdePkg/Library/BaseFdtLib/libfdt \
+            MdePkg/Library/MipiSysTLib/mipisyst
+
+      - name: Build the APEX32 UEFI application
+        run: EDK2_DIR="${RUNNER_TEMP}/edk2" ./Tools/build-edk2.sh
+
+      - name: Boot APEX32 through the removable-media fallback
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-fallback.ppm
+        run: ./Tools/test-qemu-ovmf.sh
+
+      - name: Seed BootOrder and reboot through the APEX32 NVRAM entry
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-bootorder.ppm
+        run: ./Tools/test-qemu-ovmf-bootorder.sh
+
+      - name: Complete Linux and Windows-path UEFI handoffs
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-handoff.ppm
+        run: ./Tools/test-qemu-ovmf-handoff.sh
+
+      - name: Launch real GRUB and shim through APEX32
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-real-linux.ppm
+        run: ./Tools/test-qemu-ovmf-linux-loaders.sh
+
+      - name: Preserve the framebuffer when the gate fails
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: apex32-ovmf-failure-framebuffer
+          path: ${{ runner.temp }}/apex32-ovmf-*.ppm
+          if-no-files-found: ignore

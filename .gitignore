@@ -10,4 +10,6 @@
 __pycache__/
 /cmake-build-*/
 /Installer/Linux/build/
+/Installer/Linux/package-build/
+*.deb
 *.user

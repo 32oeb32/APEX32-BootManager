@@ -23,6 +23,30 @@
 - automatic dependency checks and graphical error recovery
 - QEMU/OVMF integration matrix for Windows, GRUB, shim, and systemd-boot
 
+Current beta foundation gates:
+
+- completed: transactional mock-ESP install, rollback, persistent recovery
+  state, restore, and idempotent reinstall;
+- completed: boot the real APEX32 EFI application under OVMF and validate its
+  captured GOP framebuffer;
+- completed: seed and verify a private OVMF `Boot####` entry, promote it
+  to first in `BootOrder`, cold reboot, and require the APEX32 framebuffer;
+- completed: navigate Linux and Windows cards and transfer control through
+  real UEFI `LoadImage()` / `StartImage()` to isolated signature payloads;
+- automated gate: launch a real embedded-config GRUB image both directly and
+  through the distribution's packaged shim, then require GRUB to chainload the
+  isolated signature payload;
+- completed: build a hardware-enabled Debian package from the verified EFI
+  artifact, extract it without root, and verify its complete payload,
+  dependency metadata, firmware identity, and `INSTALL|1` / `RESTORE|1`
+  capability mode;
+- automated gate: install, reinstall, and purge the package on a disposable
+  runner, validate desktop/AppStream integration and protected ownership, and
+  prove that package management does not touch an ESP or UEFI variables;
+- next: exercise systemd-boot and a user-supplied Windows recovery image; and
+- next: install, update, restore, and remove the package through the desktop
+  GUI on the live-hardware qualification matrix.
+
 ## 1.0.0 — public stable
 
 - reproducible firmware and installer builds
