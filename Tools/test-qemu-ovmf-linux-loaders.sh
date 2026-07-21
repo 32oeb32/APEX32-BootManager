@@ -3,12 +3,12 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GRUB_MKSTANDALONE="${GRUB_MKSTANDALONE:-grub-mkstandalone}"
+GRUB_MKIMAGE="${GRUB_MKIMAGE:-grub-mkimage}"
 HANDOFF_TARGET="${APEX32_OVMF_LINUX_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfLinuxHandoffTarget.efi}"
 SCREENSHOT_BASE="${APEX32_QEMU_SCREENSHOT:-}"
 
-command -v "${GRUB_MKSTANDALONE}" >/dev/null || {
-  echo "error: ${GRUB_MKSTANDALONE} is required (install grub-efi-amd64-bin)" >&2
+command -v "${GRUB_MKIMAGE}" >/dev/null || {
+  echo "error: ${GRUB_MKIMAGE} is required (install grub-efi-amd64-bin)" >&2
   exit 2
 }
 [[ -f "${HANDOFF_TARGET}" ]] || {
@@ -71,10 +71,19 @@ printf '%s\n' \
   'chainloader /EFI/APEX32/OvmfLinuxHandoffTarget.efi' \
   'boot' \
   >"${GRUB_CONFIG}"
-"${GRUB_MKSTANDALONE}" \
+"${GRUB_MKIMAGE}" \
   --format=x86_64-efi \
   --output="${GRUB_IMAGE}" \
-  "boot/grub/grub.cfg=${GRUB_CONFIG}"
+  --config="${GRUB_CONFIG}" \
+  --prefix=/EFI/kali \
+  boot \
+  chain \
+  fat \
+  normal \
+  part_gpt \
+  part_msdos \
+  search \
+  search_fs_file
 
 GRUB_OVERLAY="${SANDBOX}/grub-overlay"
 mkdir -p "${GRUB_OVERLAY}/EFI/APEX32"
@@ -95,7 +104,7 @@ else
   APEX32_OVMF_ESP_OVERLAY="${GRUB_OVERLAY}" \
     "${PROJECT_ROOT}/Tools/test-qemu-ovmf.sh"
 fi
-echo "PASS: APEX32 launched real standalone GRUB and GRUB chainloaded the test payload"
+echo "PASS: APEX32 launched real embedded-config GRUB and GRUB chainloaded the test payload"
 
 SHIM_IMAGE="$(find_shim)"
 SHIM_OVERLAY="${SANDBOX}/shim-overlay"

@@ -37,7 +37,7 @@ PASS: APEX32 reached a stable OVMF framebuffer (800x600, ...)
 PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry
 PASS: APEX32 completed a real UEFI handoff to the linux test payload (...)
 PASS: APEX32 completed a real UEFI handoff to the windows test payload (...)
-PASS: APEX32 launched real standalone GRUB and GRUB chainloaded the test payload
+PASS: APEX32 launched real embedded-config GRUB and GRUB chainloaded the test payload
 PASS: APEX32 launched real distribution shim and shim reached GRUB's test payload
 ```
 
@@ -74,9 +74,11 @@ application with a unique framebuffer signature. Requiring that signature
 proves that the real firmware handled input, resolved the loader on the same
 virtual ESP, and successfully called UEFI `LoadImage()` and `StartImage()`.
 
-The real-Linux-loader pass creates a standalone GRUB EFI application using the
-host distribution's `grub-mkstandalone`, launches it from the configured Kali
-path, and requires GRUB to chainload the signature application. It then places
+The real-Linux-loader pass creates a self-contained GRUB EFI application using
+the host distribution's `grub-mkimage`, embeds an early chainload configuration
+and the required filesystem/search/chain modules, launches it from the
+configured Kali path, and requires GRUB to chainload the signature application.
+It then places
 the distribution's packaged `shimx64.efi` in front of the same GRUB image and
 requires the complete APEX32 → shim → GRUB → test-payload chain to finish. The
 real loader binaries come from the CI runner's operating-system packages; they
