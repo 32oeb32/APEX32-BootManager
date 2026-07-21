@@ -27,5 +27,14 @@ grep -q 'mountvol.exe' "${windows_root}/Gui/main.cpp"
 grep -q 'INSTALL|0' "${windows_root}/Gui/main.cpp"
 grep -q 'RESTORE|0' "${windows_root}/Gui/main.cpp"
 ! grep -q 'INSTALL|1' "${windows_root}/Gui/main.cpp"
+capability_probe_line="$(grep -n 'std::ofstream File' \
+  "${windows_root}/Gui/main.cpp" | cut -d: -f1)"
+gui_start_line="$(grep -n 'QApplication Application' \
+  "${windows_root}/Gui/main.cpp" | cut -d: -f1)"
+[[ -n "${capability_probe_line}" && -n "${gui_start_line}" ]]
+((capability_probe_line < gui_start_line)) || {
+  echo "FAIL: Windows capability probe initializes the GUI first" >&2
+  exit 1
+}
 
 echo "PASS: Windows package is one-launch, UAC-aware, read-only, and fail-closed for installation"

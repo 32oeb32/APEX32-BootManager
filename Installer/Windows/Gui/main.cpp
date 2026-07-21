@@ -3,7 +3,6 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
-#include <QFile>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
@@ -14,7 +13,6 @@
 #include <QSet>
 #include <QTableWidget>
 #include <QTableWidgetItem>
-#include <QTextStream>
 #include <QTimer>
 #include <QVector>
 #include <QVBoxLayout>
@@ -24,6 +22,9 @@
 #include <shellapi.h>
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <string_view>
 
 namespace {
 
@@ -333,30 +334,38 @@ class InstallerWindow final : public QMainWindow {
 }  // namespace
 
 int main(int argc, char **argv) {
-  QApplication Application(argc, argv);
-  const QStringList Arguments = QCoreApplication::arguments();
-  const QString Capabilities = QStringLiteral(
+  constexpr std::string_view Capabilities =
       "APEX32CAPS|1\n"
       "SCAN|1\n"
       "INSTALL|0\n"
       "RESTORE|0\n"
-      "UAC|1\n");
-  const int CapabilityFileIndex =
-      Arguments.indexOf(QStringLiteral("--capabilities-file"));
-  if (CapabilityFileIndex >= 0 && CapabilityFileIndex + 1 < Arguments.size()) {
-    QFile File(Arguments.at(CapabilityFileIndex + 1));
-    if (!File.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+      "UAC|1\n";
+  int CapabilityFileIndex = -1;
+  bool PrintCapabilities = false;
+  for (int Index = 1; Index < argc; ++Index) {
+    const std::string_view Argument(argv[Index]);
+    if (Argument == "--capabilities-file") {
+      CapabilityFileIndex = Index;
+    } else if (Argument == "--capabilities") {
+      PrintCapabilities = true;
+    }
+  }
+  if (CapabilityFileIndex >= 0 && CapabilityFileIndex + 1 < argc) {
+    std::ofstream File(argv[CapabilityFileIndex + 1],
+                       std::ios::binary | std::ios::trunc);
+    if (!File) {
       return 2;
     }
-    File.write(Capabilities.toUtf8());
-    File.close();
+    File << Capabilities;
     return 0;
   }
-  if (Arguments.contains(QStringLiteral("--capabilities"))) {
-    QTextStream(stdout) << Capabilities;
+  if (PrintCapabilities) {
+    std::cout << Capabilities;
     return 0;
   }
 
+  QApplication Application(argc, argv);
+  const QStringList Arguments = QCoreApplication::arguments();
   InstallerWindow Window;
   Window.show();
   if (Arguments.contains(QStringLiteral("--elevated-scan"))) {
