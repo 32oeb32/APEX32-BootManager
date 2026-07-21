@@ -99,7 +99,7 @@ def looks_like_apex32(metrics: ScreenMetrics) -> bool:
         and metrics.height >= 480
         and metrics.dark_ratio >= 0.40
         and metrics.cyan_pixels >= max(300, total // 1200)
-        and metrics.red_pixels >= max(60, total // 6000)
+        and metrics.red_pixels >= 60
     )
 
 
@@ -140,11 +140,14 @@ class QmpClient:
 
 
 def run_self_test() -> int:
-    width, height = 800, 600
+    # Match the high-resolution OVMF regression frame from CI. The tiny red
+    # APEX32 eyebrow remains one-pixel scaled at this mode, so its area does
+    # not grow in proportion to the framebuffer.
+    width, height = 1280, 800
     pixels = bytearray((2, 8, 12) * (width * height))
-    for index in range(0, 500):
+    for index in range(0, 1000):
         pixels[index * 3 : index * 3 + 3] = bytes((33, 212, 234))
-    for index in range(500, 600):
+    for index in range(1000, 1093):
         pixels[index * 3 : index * 3 + 3] = bytes((239, 77, 50))
     with tempfile.TemporaryDirectory(prefix="apex32-ppm-self-test-") as directory:
         ppm = Path(directory) / "framebuffer.ppm"
@@ -158,8 +161,8 @@ def run_self_test() -> int:
     if (
         parsed_width != width
         or parsed_height != height
-        or metrics.cyan_pixels != 500
-        or metrics.red_pixels != 100
+        or metrics.cyan_pixels != 1000
+        or metrics.red_pixels != 93
         or not looks_like_apex32(metrics)
     ):
         print("FAIL: visual analyzer self-test produced incorrect counts", file=sys.stderr)
