@@ -31,11 +31,14 @@ After building `Apex32BootManager.efi`, run:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-handoff.sh
 ```
 
 This boots the real EFI application under QEMU/OVMF and validates a captured
 GOP framebuffer. The second command creates a private APEX32 `Boot####` option,
 promotes it to the first `BootOrder` entry, cold reboots OVMF, and requires the
-gateway to render through that entry. Both commands use only a temporary
-virtual ESP and private OVMF variable store. See
+gateway to render through that entry. The third command navigates the real
+APEX32 menu and requires successful `LoadImage()` / `StartImage()` transfer to
+test-only Linux-path and Windows-path UEFI child applications. All commands use
+only a temporary virtual ESP and private OVMF variable store. See
 [QEMU/OVMF firmware testing](../Docs/QEMU_OVMF_TESTING.md).

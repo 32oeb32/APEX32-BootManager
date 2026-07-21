@@ -91,6 +91,7 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-handoff.sh
 ```
 
 See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).

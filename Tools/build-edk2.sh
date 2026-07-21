@@ -46,6 +46,8 @@ build \
 
 SOURCE_EFI="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/Apex32BootManager.efi"
 SOURCE_OVMF_SEEDER="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/OvmfBootOrderSeeder.efi"
+SOURCE_LINUX_HANDOFF="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/OvmfLinuxHandoffTarget.efi"
+SOURCE_WINDOWS_HANDOFF="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/OvmfWindowsHandoffTarget.efi"
 OUTPUT_DIR="${PROJECT_ROOT}/Build/${TARGET}_${TOOLCHAIN}/X64"
 
 if [[ ! -f "${SOURCE_EFI}" ]]; then
@@ -56,9 +58,15 @@ if [[ ! -f "${SOURCE_OVMF_SEEDER}" ]]; then
   echo "error: build finished without the OVMF boot-order test artifact" >&2
   exit 1
 fi
+if [[ ! -f "${SOURCE_LINUX_HANDOFF}" || ! -f "${SOURCE_WINDOWS_HANDOFF}" ]]; then
+  echo "error: build finished without the OVMF handoff test artifacts" >&2
+  exit 1
+fi
 
 mkdir -p "${OUTPUT_DIR}"
 install -m 0644 "${SOURCE_EFI}" "${OUTPUT_DIR}/Apex32BootManager.efi"
 install -m 0644 "${SOURCE_OVMF_SEEDER}" "${OUTPUT_DIR}/OvmfBootOrderSeeder.efi"
+install -m 0644 "${SOURCE_LINUX_HANDOFF}" "${OUTPUT_DIR}/OvmfLinuxHandoffTarget.efi"
+install -m 0644 "${SOURCE_WINDOWS_HANDOFF}" "${OUTPUT_DIR}/OvmfWindowsHandoffTarget.efi"
 sha256sum "${OUTPUT_DIR}/Apex32BootManager.efi"
 echo "built: ${OUTPUT_DIR}/Apex32BootManager.efi"

@@ -31,6 +31,8 @@
 [Components]
   APEX32-BootManager/Apex32BootManager.inf
   APEX32-BootManager/Tests/OvmfBootOrderSeeder.inf
+  APEX32-BootManager/Tests/OvmfLinuxHandoffTarget.inf
+  APEX32-BootManager/Tests/OvmfWindowsHandoffTarget.inf
 
 [BuildOptions]
   GCC:*_*_X64_CXX_FLAGS = -std=c++20 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-use-cxa-atexit

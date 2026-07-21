@@ -103,6 +103,21 @@ def looks_like_apex32(metrics: ScreenMetrics) -> bool:
     )
 
 
+def handoff_signature_ratio(pixels: bytes, target: str) -> float:
+    matching = 0
+    for offset in range(0, len(pixels), 3):
+        r, g, b = pixels[offset : offset + 3]
+        if target == "linux":
+            is_match = r <= 60 and g >= 160 and 80 <= b <= 175
+        elif target == "windows":
+            is_match = r <= 45 and 80 <= g <= 165 and b >= 170
+        else:
+            raise ValueError(f"unsupported handoff target: {target}")
+        if is_match:
+            matching += 1
+    return matching / (len(pixels) // 3)
+
+
 class QmpClient:
     def __init__(self, socket_path: Path) -> None:
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -133,6 +148,15 @@ class QmpClient:
             raise RuntimeError(f"QMP {command} failed: {response['error']}")
         if "return" not in response:
             raise RuntimeError(f"QMP {command} returned an invalid response")
+
+    def send_key(self, key: str) -> None:
+        self.execute(
+            "send-key",
+            {
+                "keys": [{"type": "qcode", "data": key}],
+                "hold-time": 100,
+            },
+        )
 
     def close(self) -> None:
         self._stream.close()
@@ -167,6 +191,12 @@ def run_self_test() -> int:
     ):
         print("FAIL: visual analyzer self-test produced incorrect counts", file=sys.stderr)
         return 1
+    if handoff_signature_ratio(bytes((0x16, 0xC7, 0x84)) * 100, "linux") != 1.0:
+        print("FAIL: Linux handoff signature self-test did not match", file=sys.stderr)
+        return 1
+    if handoff_signature_ratio(bytes((0x00, 0x78, 0xD4)) * 100, "windows") != 1.0:
+        print("FAIL: Windows handoff signature self-test did not match", file=sys.stderr)
+        return 1
     print("PASS: QEMU framebuffer analyzer self-test")
     return 0
 
@@ -176,6 +206,7 @@ def main() -> int:
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--screenshot", type=Path)
     parser.add_argument("--wait-seconds", type=float, default=45.0)
+    parser.add_argument("--handoff-target", choices=("linux", "windows"))
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -189,6 +220,9 @@ def main() -> int:
     last_error = "QMP socket did not become ready"
     last_metrics: ScreenMetrics | None = None
     first_matching_frame: float | None = None
+    first_handoff_frame: float | None = None
+    handoff_started = False
+    last_signature_ratio = 0.0
 
     try:
         while time.monotonic() < deadline and client is None:
@@ -206,25 +240,65 @@ def main() -> int:
             try:
                 client.execute("screendump", {"filename": str(args.screenshot)})
                 width, height, pixels = parse_ppm(args.screenshot)
+                if handoff_started:
+                    last_signature_ratio = handoff_signature_ratio(
+                        pixels, args.handoff_target
+                    )
+                    now = time.monotonic()
+                    if last_signature_ratio >= 0.90:
+                        if first_handoff_frame is None:
+                            first_handoff_frame = now
+                        elif now - first_handoff_frame >= 0.75:
+                            print(
+                                "PASS: APEX32 completed a real UEFI handoff to the "
+                                f"{args.handoff_target} test payload "
+                                f"({width}x{height}, signature={last_signature_ratio:.1%})"
+                            )
+                            return 0
+                    else:
+                        first_handoff_frame = None
+                    time.sleep(0.50)
+                    continue
+
                 last_metrics = analyze_screen(width, height, pixels)
                 if looks_like_apex32(last_metrics):
                     now = time.monotonic()
                     if first_matching_frame is None:
                         first_matching_frame = now
                     elif now - first_matching_frame >= 2.25:
+                        if args.handoff_target is None:
+                            print(
+                                "PASS: APEX32 reached a stable OVMF framebuffer "
+                                f"({width}x{height}, dark={last_metrics.dark_ratio:.1%}, "
+                                f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels})"
+                            )
+                            return 0
+
+                        if args.handoff_target == "windows":
+                            client.send_key("right")
+                            time.sleep(0.35)
+                            client.send_key("right")
+                            time.sleep(0.35)
+                        client.send_key("ret")
+                        handoff_started = True
+                        first_handoff_frame = None
                         print(
-                            "PASS: APEX32 reached a stable OVMF framebuffer "
-                            f"({width}x{height}, dark={last_metrics.dark_ratio:.1%}, "
-                            f"cyan={last_metrics.cyan_pixels}, red={last_metrics.red_pixels})"
+                            f"INFO: selected the {args.handoff_target} card and sent Enter"
                         )
-                        return 0
                 else:
                     first_matching_frame = None
             except (OSError, ValueError, RuntimeError) as error:
                 last_error = str(error)
             time.sleep(0.50)
 
-        if last_metrics is not None:
+        if handoff_started:
+            print(
+                "FAIL: APEX32 did not transfer control to the "
+                f"{args.handoff_target} test payload "
+                f"(last signature={last_signature_ratio:.1%})",
+                file=sys.stderr,
+            )
+        elif last_metrics is not None:
             print(
                 "FAIL: framebuffer never matched the APEX32 gateway palette "
                 f"({last_metrics.width}x{last_metrics.height}, "

@@ -26,6 +26,7 @@ Build the firmware with the pinned EDK II revision, then run:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-handoff.sh
 ```
 
 Expected result:
@@ -33,6 +34,8 @@ Expected result:
 ```text
 PASS: APEX32 reached a stable OVMF framebuffer (800x600, ...)
 PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry
+PASS: APEX32 completed a real UEFI handoff to the linux test payload (...)
+PASS: APEX32 completed a real UEFI handoff to the windows test payload (...)
 ```
 
 The test locates common Debian, Ubuntu, Fedora, and Arch OVMF paths. A custom
@@ -61,9 +64,18 @@ reboots the guest. Because the fallback path still contains only the seeder,
 the APEX32 framebuffer can appear after that reboot only when OVMF launches the
 new NVRAM entry.
 
+The handoff pass boots APEX32 twice. QMP keyboard input selects the configured
+Kali card during the first run and the configured Windows card during the
+second, then sends Enter. Each configured path contains a test-only UEFI child
+application with a unique framebuffer signature. Requiring that signature
+proves that the real firmware handled input, resolved the loader on the same
+virtual ESP, and successfully called UEFI `LoadImage()` and `StartImage()`.
+
 This proves the UEFI variable and default-entry mechanism in an isolated OVMF
-variable store. It does not yet prove that the packaged hardware installer
-performs the same transaction on every vendor firmware, that every discovered
-OS loader starts successfully, or that Secure Boot accepts an unsigned
-development build. Those remain separate gates before the installer exposes
-**Make Default** in a public package.
+variable store and the general child-image handoff mechanism. The synthetic
+handoff targets are deliberately not GRUB, shim, or Windows Boot Manager, so
+they do not claim compatibility with every real OS loader. The gate also does
+not prove that the packaged hardware installer performs the same transaction
+on every vendor firmware or that Secure Boot accepts an unsigned development
+build. Those remain separate gates before the installer exposes **Make
+Default** in a public package.

@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QEMU_BIN="${QEMU_BIN:-qemu-system-x86_64}"
 FIRMWARE="${APEX32_FIRMWARE:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/Apex32BootManager.efi}"
 SEEDER="${APEX32_OVMF_SEEDER:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfBootOrderSeeder.efi}"
+LINUX_HANDOFF="${APEX32_OVMF_LINUX_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfLinuxHandoffTarget.efi}"
+WINDOWS_HANDOFF="${APEX32_OVMF_WINDOWS_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfWindowsHandoffTarget.efi}"
 TEST_MODE="${APEX32_OVMF_TEST_MODE:-fallback}"
 
 find_ovmf_pair() {
@@ -51,6 +53,10 @@ command -v python3 >/dev/null || {
   exit 2
 }
 
+LINUX_LOADER_SOURCE=/dev/null
+WINDOWS_LOADER_SOURCE=/dev/null
+HANDOFF_ARGUMENTS=()
+
 case "${TEST_MODE}" in
   fallback)
     FALLBACK_LOADER="${FIRMWARE}"
@@ -67,8 +73,32 @@ case "${TEST_MODE}" in
     WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-75}"
     QEMU_REBOOT_OPTIONS=()
     ;;
+  handoff-linux)
+    [[ -f "${LINUX_HANDOFF}" ]] || {
+      echo "error: OVMF Linux handoff target not found at ${LINUX_HANDOFF}" >&2
+      echo "error: rebuild with Tools/build-edk2.sh first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${FIRMWARE}"
+    LINUX_LOADER_SOURCE="${LINUX_HANDOFF}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-60}"
+    QEMU_REBOOT_OPTIONS=(-no-reboot)
+    HANDOFF_ARGUMENTS=(--handoff-target linux)
+    ;;
+  handoff-windows)
+    [[ -f "${WINDOWS_HANDOFF}" ]] || {
+      echo "error: OVMF Windows handoff target not found at ${WINDOWS_HANDOFF}" >&2
+      echo "error: rebuild with Tools/build-edk2.sh first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${FIRMWARE}"
+    WINDOWS_LOADER_SOURCE="${WINDOWS_HANDOFF}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-60}"
+    QEMU_REBOOT_OPTIONS=(-no-reboot)
+    HANDOFF_ARGUMENTS=(--handoff-target windows)
+    ;;
   *)
-    echo "error: APEX32_OVMF_TEST_MODE must be fallback or bootorder" >&2
+    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, handoff-linux, or handoff-windows" >&2
     exit 2
     ;;
 esac
@@ -112,8 +142,8 @@ mkdir -p \
 install -m 0644 "${FALLBACK_LOADER}" "${ESP_ROOT}/EFI/BOOT/BOOTX64.EFI"
 install -m 0644 "${FIRMWARE}" "${ESP_ROOT}/EFI/APEX32/Apex32BootManager.efi"
 install -m 0644 /dev/null "${ESP_ROOT}/EFI/BlackArch_Linux/grubx64.efi"
-install -m 0644 /dev/null "${ESP_ROOT}/EFI/kali/grubx64.efi"
-install -m 0644 /dev/null "${ESP_ROOT}/EFI/Microsoft/Boot/bootmgfw.efi"
+install -m 0644 "${LINUX_LOADER_SOURCE}" "${ESP_ROOT}/EFI/kali/grubx64.efi"
+install -m 0644 "${WINDOWS_LOADER_SOURCE}" "${ESP_ROOT}/EFI/Microsoft/Boot/bootmgfw.efi"
 install -m 0644 "${OVMF_VARS_PATH}" "${SANDBOX}/OVMF_VARS.fd"
 install -m 0644 \
   "${PROJECT_ROOT}/Config/apex32.cfg.example" \
@@ -141,7 +171,8 @@ QEMU_PID=$!
 python3 "${PROJECT_ROOT}/Tests/QemuOvmfVisualTest.py" \
   --socket "${QMP_SOCKET}" \
   --screenshot "${SCREENSHOT}" \
-  --wait-seconds "${WAIT_SECONDS}"
+  --wait-seconds "${WAIT_SECONDS}" \
+  "${HANDOFF_ARGUMENTS[@]}"
 
 if [[ "${TEST_MODE}" == "bootorder" ]]; then
   echo "PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry"

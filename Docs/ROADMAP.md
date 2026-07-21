@@ -29,9 +29,11 @@ Current beta foundation gates:
   state, restore, and idempotent reinstall;
 - completed: boot the real APEX32 EFI application under OVMF and validate its
   captured GOP framebuffer;
-- automated gate: seed and verify a private OVMF `Boot####` entry, promote it
+- completed: seed and verify a private OVMF `Boot####` entry, promote it
   to first in `BootOrder`, cold reboot, and require the APEX32 framebuffer;
-- next: exercise loader handoff with representative Windows and Linux test
+- completed: navigate Linux and Windows cards and transfer control through
+  real UEFI `LoadImage()` / `StartImage()` to isolated signature payloads;
+- next: exercise representative GRUB, shim, systemd-boot, and Windows recovery
   images; and
 - next: package, install, update, restore, and uninstall entirely through the
   desktop GUI.

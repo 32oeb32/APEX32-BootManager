@@ -1,0 +1,24 @@
+## @file
+# Test-only UEFI application that marks a successful Windows-path handoff.
+##
+
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = OvmfWindowsHandoffTarget
+  FILE_GUID      = 622AA92F-C231-40E0-A2D4-DF753878A52C
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.11.0
+  ENTRY_POINT    = UefiMain
+
+[Sources]
+  OvmfWindowsHandoffTarget.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
