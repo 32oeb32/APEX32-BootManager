@@ -1,0 +1,33 @@
+## @file
+# Test-only UEFI application that seeds and promotes an APEX32 OVMF boot entry.
+##
+
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = OvmfBootOrderSeeder
+  FILE_GUID      = 814F9BB7-AFA4-4C1E-9937-F770A7D16840
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.11.0
+  ENTRY_POINT    = UefiMain
+
+[Sources]
+  OvmfBootOrderSeeder.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+
+[Guids]
+  gEfiGlobalVariableGuid
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid
+

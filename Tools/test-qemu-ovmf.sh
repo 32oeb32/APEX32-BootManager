@@ -5,6 +5,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QEMU_BIN="${QEMU_BIN:-qemu-system-x86_64}"
 FIRMWARE="${APEX32_FIRMWARE:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/Apex32BootManager.efi}"
+SEEDER="${APEX32_OVMF_SEEDER:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfBootOrderSeeder.efi}"
+TEST_MODE="${APEX32_OVMF_TEST_MODE:-fallback}"
 
 find_ovmf_pair() {
   local code_candidate
@@ -49,6 +51,28 @@ command -v python3 >/dev/null || {
   exit 2
 }
 
+case "${TEST_MODE}" in
+  fallback)
+    FALLBACK_LOADER="${FIRMWARE}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-45}"
+    QEMU_REBOOT_OPTIONS=(-no-reboot)
+    ;;
+  bootorder)
+    [[ -f "${SEEDER}" ]] || {
+      echo "error: OVMF boot-order seeder not found at ${SEEDER}" >&2
+      echo "error: rebuild with Tools/build-edk2.sh first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${SEEDER}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-75}"
+    QEMU_REBOOT_OPTIONS=()
+    ;;
+  *)
+    echo "error: APEX32_OVMF_TEST_MODE must be fallback or bootorder" >&2
+    exit 2
+    ;;
+esac
+
 OVMF_OUTPUT="$(find_ovmf_pair)"
 mapfile -t OVMF_PATHS <<<"${OVMF_OUTPUT}"
 if [[ "${#OVMF_PATHS[@]}" -ne 2 ]]; then
@@ -85,7 +109,7 @@ mkdir -p \
   "${ESP_ROOT}/EFI/kali" \
   "${ESP_ROOT}/EFI/Microsoft/Boot" \
   "$(dirname "${SCREENSHOT}")"
-install -m 0644 "${FIRMWARE}" "${ESP_ROOT}/EFI/BOOT/BOOTX64.EFI"
+install -m 0644 "${FALLBACK_LOADER}" "${ESP_ROOT}/EFI/BOOT/BOOTX64.EFI"
 install -m 0644 "${FIRMWARE}" "${ESP_ROOT}/EFI/APEX32/Apex32BootManager.efi"
 install -m 0644 /dev/null "${ESP_ROOT}/EFI/BlackArch_Linux/grubx64.efi"
 install -m 0644 /dev/null "${ESP_ROOT}/EFI/kali/grubx64.efi"
@@ -109,7 +133,7 @@ install -m 0644 \
   -monitor none \
   -serial "file:${SERIAL_LOG}" \
   -net none \
-  -no-reboot \
+  "${QEMU_REBOOT_OPTIONS[@]}" \
   -qmp "unix:${QMP_SOCKET},server=on,wait=off" \
   >/dev/null 2>&1 &
 QEMU_PID=$!
@@ -117,7 +141,11 @@ QEMU_PID=$!
 python3 "${PROJECT_ROOT}/Tests/QemuOvmfVisualTest.py" \
   --socket "${QMP_SOCKET}" \
   --screenshot "${SCREENSHOT}" \
-  --wait-seconds "${APEX32_QEMU_WAIT_SECONDS:-45}"
+  --wait-seconds "${WAIT_SECONDS}"
+
+if [[ "${TEST_MODE}" == "bootorder" ]]; then
+  echo "PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry"
+fi
 
 wait "${QEMU_PID}" 2>/dev/null || true
 QEMU_PID=""

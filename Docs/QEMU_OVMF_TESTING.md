@@ -25,12 +25,14 @@ Build the firmware with the pinned EDK II revision, then run:
 
 ```bash
 ./Tools/test-qemu-ovmf.sh
+./Tools/test-qemu-ovmf-bootorder.sh
 ```
 
 Expected result:
 
 ```text
 PASS: APEX32 reached a stable OVMF framebuffer (800x600, ...)
+PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry
 ```
 
 The test locates common Debian, Ubuntu, Fedora, and Arch OVMF paths. A custom
@@ -52,7 +54,16 @@ This gate proves that EDK II produced a bootable x86_64 UEFI application, OVMF
 can launch it from the removable-media fallback path, GOP initializes, the
 configuration is read from the virtual ESP, and the branded OS menu renders.
 
-It does not yet prove that a hardware installer creates and promotes a real
-`Boot####` entry, that every discovered OS loader starts successfully, or that
-Secure Boot accepts an unsigned development build. Those remain separate gates
-before the installer exposes **Make Default** in a public package.
+The second pass starts with a test-only seeder as `BOOTX64.EFI`. The seeder
+creates `Boot7A32` for the canonical APEX32 path, removes duplicate `7A32`
+values, places it first in `BootOrder`, verifies the stored order, and cold
+reboots the guest. Because the fallback path still contains only the seeder,
+the APEX32 framebuffer can appear after that reboot only when OVMF launches the
+new NVRAM entry.
+
+This proves the UEFI variable and default-entry mechanism in an isolated OVMF
+variable store. It does not yet prove that the packaged hardware installer
+performs the same transaction on every vendor firmware, that every discovered
+OS loader starts successfully, or that Secure Boot accepts an unsigned
+development build. Those remain separate gates before the installer exposes
+**Make Default** in a public package.

@@ -34,7 +34,8 @@ personal APEX32 installation or development tree.
   duplicate-free reinstall, immutable backup, automatic rollback, persistent
   recovery state, and full restore/uninstall semantics;
 - an OVMF visual gate that boots the real EFI application from a temporary
-  virtual ESP and verifies that the APEX32 gateway reaches the framebuffer;
+  virtual ESP, then seeds a private APEX32 `Boot####` entry, promotes it to
+  first in `BootOrder`, reboots, and verifies the gateway framebuffer;
 - a polkit-authorized helper design reserved for a future packaged installer
   that will install APEX32 without terminal commands; and
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
@@ -89,6 +90,7 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 
 ```bash
 ./Tools/test-qemu-ovmf.sh
+./Tools/test-qemu-ovmf-bootorder.sh
 ```
 
 See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).

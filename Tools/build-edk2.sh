@@ -45,14 +45,20 @@ build \
   -p APEX32-BootManager/Apex32BootManager.dsc
 
 SOURCE_EFI="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/Apex32BootManager.efi"
+SOURCE_OVMF_SEEDER="${EDK2_DIR}/Build/Apex32BootManager/${TARGET}_${TOOLCHAIN}/X64/OvmfBootOrderSeeder.efi"
 OUTPUT_DIR="${PROJECT_ROOT}/Build/${TARGET}_${TOOLCHAIN}/X64"
 
 if [[ ! -f "${SOURCE_EFI}" ]]; then
   echo "error: build finished without the expected EFI artifact" >&2
   exit 1
 fi
+if [[ ! -f "${SOURCE_OVMF_SEEDER}" ]]; then
+  echo "error: build finished without the OVMF boot-order test artifact" >&2
+  exit 1
+fi
 
 mkdir -p "${OUTPUT_DIR}"
 install -m 0644 "${SOURCE_EFI}" "${OUTPUT_DIR}/Apex32BootManager.efi"
+install -m 0644 "${SOURCE_OVMF_SEEDER}" "${OUTPUT_DIR}/OvmfBootOrderSeeder.efi"
 sha256sum "${OUTPUT_DIR}/Apex32BootManager.efi"
 echo "built: ${OUTPUT_DIR}/Apex32BootManager.efi"
