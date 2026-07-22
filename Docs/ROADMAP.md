@@ -54,6 +54,28 @@ PR #7 deliberately does not contain a BCDEdit or firmware-variable backend.
 The next Windows milestone packages the verified EFI image and implements the
 narrow real firmware store behind this already-tested transaction contract.
 
+## PR #8 — Windows transaction path repair
+
+- normalized Qt transaction paths before case-insensitive confinement;
+- restored the disposable Windows lifecycle on MSVC; and
+- changed no installation capability or host firmware state.
+
+## PR #9 — Windows production installer and isolated firmware lifecycle
+
+- package the same pinned, verified EFI artifact used by Linux;
+- enable graphical scan, install, make-default, and restore only in that
+  hardware-enabled package;
+- manage `Boot####` and `BootOrder` through Windows firmware-variable APIs;
+- preserve exact variables and immutable ESP recovery state;
+- block the unsigned Community beta while Secure Boot is enabled;
+- test native logic against fake variables on Windows and a real create,
+  promote, restore, and remove cycle under private OVMF firmware;
+- install and remove the NSIS package on the disposable runner; and
+- eliminate duplicate feature-branch push and pull-request workflows.
+
+PR #9 does not claim live-hardware qualification or a signed Secure Boot
+release. Those are the consolidated final release gates.
+
 ## 0.10.0-alpha1 — dynamic public foundation
 
 - GPL-3.0 repository foundation

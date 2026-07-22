@@ -2,7 +2,12 @@ name: ovmf-visual-smoke
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -53,6 +58,9 @@ jobs:
         env:
           APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-bootorder.ppm
         run: ./Tools/test-qemu-ovmf-bootorder.sh
+
+      - name: Install, promote, restore, and remove an isolated UEFI entry
+        run: ./Tools/test-qemu-ovmf-installer-lifecycle.sh
 
       - name: Discover and launch a native Boot#### device path
         env:

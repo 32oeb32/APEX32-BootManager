@@ -36,6 +36,7 @@ After building `Apex32BootManager.efi`, run:
 ./Tools/test-qemu-ovmf-native-discovery.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
+./Tools/test-qemu-ovmf-installer-lifecycle.sh
 ```
 
 This boots the real EFI application under QEMU/OVMF and validates a captured
@@ -56,6 +57,11 @@ launches the packaged shim which in turn starts GRUB. Both paths must chainload
 the isolated framebuffer-signature payload. Neither GRUB nor shim is stored in
 this repository.
 
+The sixth command exercises the installer-side firmware lifecycle inside the
+private OVMF store: create an APEX32 `Boot####` option, promote it, verify it,
+restore the exact original order, and remove the created option. It exits only
+after reading the restored variables back. No host EFI state is reachable.
+
 The Debian package has its own isolated gate:
 
 ```bash
@@ -70,3 +76,9 @@ dependencies, install/restore capability flags, and byte-identical firmware.
 The `linux-package` workflow then runs the CI-confined package lifecycle test,
 which installs, reinstalls, and purges the candidate only on a disposable
 runner with no ESP or UEFI variable filesystem.
+
+The Windows CTest suite runs the file transaction engine in `QTemporaryDir`
+and runs the native `Boot####` backend against an in-memory variable adapter.
+The Windows packaging job contains the verified real EFI binary but never
+invokes the host firmware adapter. See
+[Windows production installer](../Docs/WINDOWS_PRODUCTION_INSTALLER.md).

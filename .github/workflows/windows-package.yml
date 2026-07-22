@@ -2,17 +2,63 @@ name: windows-package
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  build-windows-preview:
+  build-verified-firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install EDK II build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential git iasl nasm python3 uuid-dev
+
+      - name: Check out the pinned EDK II revision
+        shell: bash
+        run: |
+          source Tools/edk2-version
+          git clone --depth 1 --branch "${EDK2_TAG}" \
+            https://github.com/tianocore/edk2.git \
+            "${RUNNER_TEMP}/edk2"
+          test "$(git -C "${RUNNER_TEMP}/edk2" rev-parse HEAD)" = "${EDK2_COMMIT}"
+          git -C "${RUNNER_TEMP}/edk2" submodule update --init --depth 1 \
+            BaseTools/Source/C/BrotliCompress/brotli \
+            MdePkg/Library/BaseFdtLib/libfdt \
+            MdePkg/Library/MipiSysTLib/mipisyst
+
+      - name: Build the verified APEX32 firmware
+        run: EDK2_DIR="${RUNNER_TEMP}/edk2" ./Tools/build-edk2.sh
+
+      - name: Publish firmware for the isolated Windows package job
+        uses: actions/upload-artifact@v6
+        with:
+          name: apex32-verified-windows-firmware
+          path: Build/DEBUG_GCC/X64/Apex32BootManager.efi
+          if-no-files-found: error
+
+  build-windows-installer:
+    needs: build-verified-firmware
     # Qt uses the MSVC 2022 ABI, so keep the runner toolchain identical.
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
+
+      - name: Download the verified firmware produced by this workflow
+        uses: actions/download-artifact@v6
+        with:
+          name: apex32-verified-windows-firmware
+          path: Build/DEBUG_GCC/X64
 
       - name: Install Qt and NSIS build dependencies
         shell: pwsh
@@ -22,17 +68,21 @@ jobs:
             --outputdir "$env:RUNNER_TEMP/Qt"
           choco install nsis --yes --no-progress
 
-      - name: Build the graphical Windows transaction candidate
+      - name: Build and test the graphical Windows installer
         shell: pwsh
         run: |
           $qt = "$env:RUNNER_TEMP/Qt/6.8.3/msvc2022_64"
           $env:PATH = "$qt/bin;$env:PATH"
+          $firmware = (Resolve-Path `
+            Build/DEBUG_GCC/X64/Apex32BootManager.efi).Path
           cmake `
             -S Installer/Windows `
             -B Installer/Windows/build `
             -G "Visual Studio 17 2022" `
             -A x64 `
-            -DCMAKE_PREFIX_PATH="$qt"
+            -DCMAKE_PREFIX_PATH="$qt" `
+            -DAPEX32_ENABLE_HARDWARE_INSTALL=ON `
+            -DAPEX32_FIRMWARE="$firmware"
           cmake --build Installer/Windows/build --config Release --parallel
           cmake `
             --install Installer/Windows/build `
@@ -45,10 +95,22 @@ jobs:
           if (Test-Path "Installer/Windows/build/stage/bin/apex32-windows-transaction-test.exe") {
             throw "The disposable transaction test must not be installed"
           }
+          if (Test-Path "Installer/Windows/build/stage/bin/apex32-windows-native-firmware-test.exe") {
+            throw "The fake firmware-variable test must not be installed"
+          }
 
-      - name: Verify fail-closed capabilities
+      - name: Verify packaged firmware and production capabilities
         shell: pwsh
         run: |
+          $source = Get-FileHash `
+            Build/DEBUG_GCC/X64/Apex32BootManager.efi `
+            -Algorithm SHA256
+          $packaged = Get-FileHash `
+            Installer/Windows/build/stage/share/apex32/Apex32BootManager.efi `
+            -Algorithm SHA256
+          if ($source.Hash -ne $packaged.Hash) {
+            throw "The staged Windows firmware differs from the verified build"
+          }
           $env:QT_QPA_PLATFORM = "offscreen"
           $probe = Start-Process `
             -FilePath Installer/Windows/build/stage/bin/apex32-installer.exe `
@@ -66,15 +128,15 @@ jobs:
             "APEX32CAPS|1",
             "SCAN|1",
             "TRANSACTION|1",
-            "INSTALL|0",
-            "RESTORE|0",
+            "INSTALL|1",
+            "RESTORE|1",
             "UAC|1"
           )
           if (Compare-Object $expected $actual) {
             throw "Unexpected Windows capability mode"
           }
 
-      - name: Build the one-launch setup executable
+      - name: Build and exercise the one-launch setup executable
         shell: pwsh
         run: |
           $env:PATH = "C:/Program Files (x86)/NSIS;$env:PATH"
@@ -90,9 +152,45 @@ jobs:
             throw "Expected one Windows setup executable"
           }
 
-      - name: Publish the Windows transaction preview artifact
+          $installRoot = "$env:RUNNER_TEMP\APEX32PackageLifecycle"
+          $install = Start-Process `
+            -FilePath $setups[0].FullName `
+            -ArgumentList @("/S", "/D=$installRoot") `
+            -Wait `
+            -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Silent setup installation failed"
+          }
+          $installedFirmware = "$installRoot\share\apex32\Apex32BootManager.efi"
+          $installedGui = "$installRoot\bin\apex32-installer.exe"
+          if (!(Test-Path $installedFirmware) -or !(Test-Path $installedGui)) {
+            throw "The setup omitted the GUI or verified firmware"
+          }
+          $sourceHash = (Get-FileHash `
+            Build/DEBUG_GCC/X64/Apex32BootManager.efi -Algorithm SHA256).Hash
+          if ((Get-FileHash $installedFirmware -Algorithm SHA256).Hash -ne $sourceHash) {
+            throw "The installed firmware differs from the verified build"
+          }
+
+          $uninstall = Start-Process `
+            -FilePath "$installRoot\Uninstall.exe" `
+            -ArgumentList "/S" `
+            -Wait `
+            -PassThru
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Silent setup removal failed"
+          }
+
+          $hash = (Get-FileHash $setups[0].FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($setups[0].Name)" | Set-Content `
+            "Installer/Windows/build/package/$($setups[0].Name).sha256" `
+            -Encoding ascii
+
+      - name: Publish the tested Windows beta package
         uses: actions/upload-artifact@v6
         with:
-          name: APEX32-Community-Windows-Transaction-Preview
-          path: Installer/Windows/build/package/APEX32-Community-Setup*.exe
+          name: APEX32-Community-Windows-Beta
+          path: |
+            Installer/Windows/build/package/APEX32-Community-Setup*.exe
+            Installer/Windows/build/package/APEX32-Community-Setup*.exe.sha256
           if-no-files-found: error

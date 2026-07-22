@@ -60,14 +60,15 @@ personal APEX32 installation or development tree.
 This is a beta candidate, not yet a universal production installer. Existing
 firmware entries can now launch across EFI System Partitions. Raw ESP scanning
 for loaders without a `Boot####` option, signed release artifacts, additional
-distro packages, and the completed recovery GUI remain release gates.
-The Windows package now contains a reusable, rollback-tested transaction
-foundation and runs its complete simulated lifecycle on a disposable Windows
-runner. Its real firmware backend and verified EFI payload are still locked,
-so install/default/restore are not advertised as complete. See
+distro packages, and live graphical install/reboot/restore qualification remain
+release gates.
+The Windows package now contains the reusable transaction engine, a native
+`Boot####`/`BootOrder` backend, and the same verified EFI payload as Linux.
+The Windows and OVMF workflows cover isolated file and firmware-variable
+lifecycle tests without touching runner firmware. See
 [boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
-[Windows transaction foundation](Docs/WINDOWS_TRANSACTION_FOUNDATION.md) for
-the precise milestone boundary.
+[Windows graphical installer](Docs/WINDOWS_PRODUCTION_INSTALLER.md) for the
+precise capability and qualification boundary.
 
 Installer contributors can run a root-refusing mock-ESP test and a visibly
 disabled safe GUI demo without touching their boot configuration. See
@@ -103,17 +104,17 @@ The launcher downloads and verifies the tested package, requests graphical
 PolicyKit authorization, installs it, and opens the GUI. It never builds EDK II
 or asks the user to copy EFI files or edit firmware variables.
 
-Windows users will download and double-click one
-`APEX32-Community-Setup.exe`. The current Windows package is a scan and
-transaction preview. It keeps boot installation disabled until the native
-firmware backend, verified EFI payload, disposable UEFI-VM lifecycle, and real
-hardware qualification pass. See
+Windows users download and double-click one
+`APEX32-Community-Setup.exe`. The CI-built package embeds the verified
+firmware and enables graphical scan, install, make-default, and restore. A
+source-only contributor build remains scan-only unless it explicitly receives
+that verified firmware. See
 [one-step installation](Docs/ONE_STEP_INSTALL.md).
 
-The Windows preview uses the normal UAC consent dialog for read-only scanning.
-Its transaction and recovery contract is CI-tested, but the hardware firmware
-backend is not enabled yet; Windows users will not be asked to clone the
-repository or use a terminal. See the
+The Windows package uses one normal UAC consent dialog and never asks users to
+clone the repository or type a command. The unsigned Community beta refuses
+installation while Secure Boot is enabled; signing and live-hardware
+qualification remain release gates. See the
 [GUI installer release plan](Docs/GUI_INSTALLER_PLAN.md).
 
 ## Build the firmware

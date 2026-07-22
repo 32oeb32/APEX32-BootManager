@@ -16,6 +16,7 @@
 !include MdePkg/MdeLibs.dsc.inc
 
 [LibraryClasses.common]
+  IoLib|MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsic.inf
   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
   BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
   DebugLib|MdePkg/Library/BaseDebugLibNull/BaseDebugLibNull.inf
@@ -31,6 +32,7 @@
 [Components]
   APEX32-BootManager/Apex32BootManager.inf
   APEX32-BootManager/Tests/OvmfBootOrderSeeder.inf
+  APEX32-BootManager/Tests/OvmfInstallerLifecycle.inf
   APEX32-BootManager/Tests/OvmfLinuxHandoffTarget.inf
   APEX32-BootManager/Tests/OvmfWindowsHandoffTarget.inf
 

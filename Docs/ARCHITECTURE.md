@@ -30,10 +30,10 @@ See [Graphics foundation](GRAPHICS_FOUNDATION.md) and
 
 ## Graphical installer
 
-The Linux GUI is the user-facing configuration plane. It scans mounted EFI
-System Partitions for `.efi` applications, recognizes common vendor paths,
-allows entries to be selected, generates schema 1, and requests installation
-through a graphical authorization prompt.
+The Linux and Windows GUIs are the user-facing configuration planes. They scan
+the EFI System Partition for `.efi` applications, recognize common vendor
+paths, allow entries to be selected, generate schema 1, and request platform
+graphical authorization before any privileged operation.
 
 Cards are not hardcoded. Firmware performs read-only native `BootOrder` and
 `Boot####` discovery, retains complete validated device paths for cross-ESP
@@ -46,10 +46,20 @@ an immutable first backup, atomically copies the firmware/configuration, creates
 or reuses the APEX32 NVRAM entry, and places that entry first in `BootOrder`.
 It does not accept shell fragments or execute a shell.
 
+On Windows, `WindowsFirmwareStore` implements the same transaction contract
+through the native firmware-environment APIs. It captures exact variable bytes
+and attributes, creates or reuses one APEX32 load option, verifies promotion,
+and supports exact graphical restore. The package is hardware-capable only
+when CMake embeds the SHA-256 of a verified EFI payload; ordinary source builds
+remain scan-only. See
+[Windows production installer](WINDOWS_PRODUCTION_INSTALLER.md).
+
 ## Trust boundary
 
 - Firmware configuration is data, never executable source.
 - Loader paths are bounded and must be absolute EFI paths.
 - The firmware is read-only after installation.
-- Mutating operations remain in an OS-side, polkit-authorized helper.
+- Mutating operations remain in a graphically authorized OS-side component:
+  the narrow polkit helper on Linux or the UAC-elevated native backend on
+  Windows.
 - Recovery and uninstall must be available before a stable public release.

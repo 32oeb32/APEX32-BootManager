@@ -215,12 +215,13 @@ pass.
 ## End-user packages and Windows
 
 These commands are contributor tests, not the intended customer experience.
-The Linux beta will be launched from a desktop icon and will use only the
-desktop PolicyKit dialog. The Windows candidate is one NSIS setup executable
-that uses the standard UAC consent dialog. Neither packaged flow requires a
-terminal. The Windows candidate is not a hardware installer yet: its visible
-install and restore controls remain locked while the native firmware backend
-is being qualified.
+The Linux beta is launched from a desktop icon and uses only the desktop
+PolicyKit dialog. The Windows candidate is one NSIS setup executable that uses
+the standard UAC consent dialog. Neither packaged flow requires a terminal.
+The CI-built Windows package now enables scan, transactional install,
+make-default, and graphical restore; ordinary source builds keep those controls
+locked unless an explicitly verified firmware payload is supplied. Live
+hardware and signing qualification still precede public release.
 
 ## Debian package candidate
 
@@ -262,11 +263,22 @@ confined command doubles. It verifies the release package and checksum,
 requires graphical-only PolicyKit invocation, launches the installed GUI, and
 proves that a checksum mismatch stops before privilege elevation.
 
-`Tests/WindowsPackageStaticTest.sh` keeps the Windows preview fail-closed in
-Linux host CI. The separate `windows-package` workflow builds the Qt
-application and NSIS setup on a disposable Windows runner, runs
-`windows-transaction-lifecycle`, runs the GUI capability probe, and publishes
-one setup artifact. The transaction test uses `QTemporaryDir` for its ESP and
-a JSON firmware store; it is excluded from the package. Expected capabilities
-are `TRANSACTION|1`, `INSTALL|0`, and `RESTORE|0`. See
-[Windows transaction foundation](WINDOWS_TRANSACTION_FOUNDATION.md).
+`Tests/WindowsPackageStaticTest.sh` verifies that Windows hardware capability
+is compile-time gated and that the production package receives a verified EFI
+artifact. The separate `windows-package` workflow builds that artifact from
+the pinned EDK II revision, transfers it to a disposable Windows runner, runs
+both transaction tests, verifies the staged firmware hash, checks
+`TRANSACTION|1`, `INSTALL|1`, and `RESTORE|1`, then installs and removes the
+NSIS package under the runner's temporary directory.
+
+`windows-transaction-lifecycle` uses `QTemporaryDir` plus a JSON store for the
+complete file transaction. `windows-native-firmware-store` uses only in-memory
+`Boot####` variables. Both are excluded from the package. The real variable
+lifecycle runs separately under OVMF through:
+
+```bash
+./Tools/test-qemu-ovmf-installer-lifecycle.sh
+```
+
+It must report exact BootOrder restoration and removal of the temporary entry.
+See [Windows graphical installation](WINDOWS_PRODUCTION_INSTALLER.md).

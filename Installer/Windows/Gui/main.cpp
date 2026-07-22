@@ -1,8 +1,11 @@
-#include <QApplication>
 #include <QAbstractItemView>
+#include <QApplication>
+#include <QCheckBox>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QLabel>
@@ -18,6 +21,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "Transaction/WindowsFirmwareStore.hpp"
 #include "Transaction/WindowsTransaction.hpp"
 
 #include <windows.h>
@@ -26,15 +30,29 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+
+#ifndef APEX32_ENABLE_HARDWARE_INSTALL
+#define APEX32_ENABLE_HARDWARE_INSTALL 0
+#endif
+
+#ifndef APEX32_PACKAGED_FIRMWARE_SHA256
+#define APEX32_PACKAGED_FIRMWARE_SHA256 ""
+#endif
 
 namespace {
 
 constexpr int kMaximumLoaders = 64;
+constexpr int kMaximumSelectedLoaders = 32;
+constexpr bool kHardwareInstallEnabled =
+    APEX32_ENABLE_HARDWARE_INSTALL != 0;
 
 struct Loader {
   QString Name;
   QString Path;
+  QString Icon;
+  bool DefaultSelected = true;
 };
 
 bool IsAdministrator() {
@@ -56,9 +74,7 @@ bool IsAdministrator() {
     return false;
   }
   const BOOL Checked = CheckTokenMembership(
-      nullptr,
-      AdministratorsGroup,
-      &IsMember);
+      nullptr, AdministratorsGroup, &IsMember);
   FreeSid(AdministratorsGroup);
   return Checked != FALSE && IsMember != FALSE;
 }
@@ -87,7 +103,8 @@ bool RunTool(
     if (Error != nullptr) {
       *Error = QString::fromLocal8Bit(Process.readAllStandardError()).trimmed();
       if (Error->isEmpty()) {
-        *Error = QString::fromLocal8Bit(Process.readAllStandardOutput()).trimmed();
+        *Error =
+            QString::fromLocal8Bit(Process.readAllStandardOutput()).trimmed();
       }
       if (Error->isEmpty()) {
         *Error = QStringLiteral("The Windows system tool rejected the request.");
@@ -108,10 +125,72 @@ QString FreeDriveLetter() {
   return {};
 }
 
+class EspMount final {
+ public:
+  EspMount() = default;
+  EspMount(const EspMount &) = delete;
+  EspMount &operator=(const EspMount &) = delete;
+
+  ~EspMount() {
+    Unmount();
+  }
+
+  bool Mount(QString *Error) {
+    Drive_ = FreeDriveLetter();
+    if (Drive_.isEmpty()) {
+      if (Error != nullptr) {
+        *Error = QStringLiteral("No temporary drive letter is available.");
+      }
+      return false;
+    }
+    if (!RunTool(
+            WindowsTool(QStringLiteral("mountvol.exe")),
+            {Drive_, QStringLiteral("/S")},
+            Error)) {
+      Drive_.clear();
+      return false;
+    }
+    Mounted_ = true;
+    if (!QFileInfo(EfiDirectory()).isDir()) {
+      if (Error != nullptr) {
+        *Error = QStringLiteral("The mounted system partition has no EFI directory.");
+      }
+      Unmount();
+      return false;
+    }
+    return true;
+  }
+
+  QString RootDirectory() const {
+    return Drive_ + QStringLiteral("\\");
+  }
+
+  QString EfiDirectory() const {
+    return Drive_ + QStringLiteral("\\EFI");
+  }
+
+ private:
+  void Unmount() {
+    if (!Mounted_) {
+      return;
+    }
+    QString Ignored;
+    RunTool(
+        WindowsTool(QStringLiteral("mountvol.exe")),
+        {Drive_, QStringLiteral("/D")},
+        &Ignored);
+    Mounted_ = false;
+    Drive_.clear();
+  }
+
+  QString Drive_;
+  bool Mounted_ = false;
+};
+
 QString FriendlyName(const QString &RelativePath) {
   const QString Lower = RelativePath.toLower();
   if (Lower.contains(QStringLiteral("\\microsoft\\"))) {
-    return QStringLiteral("WINDOWS");
+    return QStringLiteral("WINDOWS BOOT MANAGER");
   }
   if (Lower.contains(QStringLiteral("\\kali\\"))) {
     return QStringLiteral("KALI LINUX");
@@ -151,75 +230,101 @@ QString FriendlyName(const QString &RelativePath) {
     return QStringLiteral("LINUX");
   }
   if (Lower.endsWith(QStringLiteral("bootx64.efi"))) {
-    return QStringLiteral("UEFI FALLBACK");
+    return QStringLiteral("UEFI FALLBACK (RECOVERY)");
   }
   return QStringLiteral("UEFI APPLICATION");
 }
 
-class EspMount final {
- public:
-  EspMount() = default;
-  EspMount(const EspMount &) = delete;
-  EspMount &operator=(const EspMount &) = delete;
+QString IconName(const QString &Name) {
+  const QString Lower = Name.toLower();
+  if (Lower.contains(QStringLiteral("windows"))) return QStringLiteral("windows");
+  if (Lower.contains(QStringLiteral("kali"))) return QStringLiteral("kali");
+  if (Lower.contains(QStringLiteral("blackarch"))) return QStringLiteral("blackarch");
+  if (Lower.contains(QStringLiteral("ubuntu"))) return QStringLiteral("ubuntu");
+  if (Lower.contains(QStringLiteral("fedora"))) return QStringLiteral("fedora");
+  if (Lower.contains(QStringLiteral("debian"))) return QStringLiteral("debian");
+  if (Lower.contains(QStringLiteral("mint"))) return QStringLiteral("mint");
+  if (Lower.contains(QStringLiteral("opensuse"))) return QStringLiteral("opensuse");
+  if (Lower.contains(QStringLiteral("pop!"))) return QStringLiteral("popos");
+  if (Lower.contains(QStringLiteral("opencore"))) return QStringLiteral("opencore");
+  if (Lower.contains(QStringLiteral("arch"))) return QStringLiteral("arch");
+  if (Lower.contains(QStringLiteral("recovery"))) return QStringLiteral("recovery");
+  if (Lower.contains(QStringLiteral("linux"))) return QStringLiteral("linux");
+  return QStringLiteral("generic");
+}
 
-  ~EspMount() {
-    Unmount();
+bool SafeConfigurationField(const QString &Value, int Maximum) {
+  if (Value.isEmpty() || Value.size() > Maximum || Value.contains(QLatin1Char('|'))) {
+    return false;
   }
-
-  bool Mount(QString *Error) {
-    Drive_ = FreeDriveLetter();
-    if (Drive_.isEmpty()) {
-      if (Error != nullptr) {
-        *Error = QStringLiteral("No temporary drive letter is available.");
-      }
+  for (const QChar Character : Value) {
+    const ushort Code = Character.unicode();
+    if (Code < 0x20 || Code > 0x7e) {
       return false;
     }
-    if (!RunTool(
-            WindowsTool(QStringLiteral("mountvol.exe")),
-            {Drive_, QStringLiteral("/S")},
-            Error)) {
-      Drive_.clear();
-      return false;
-    }
-    Mounted_ = true;
-    const QString EfiDirectory = Drive_ + QStringLiteral("\\EFI");
-    if (!QFileInfo(EfiDirectory).isDir()) {
-      if (Error != nullptr) {
-        *Error = QStringLiteral("The mounted system partition has no EFI directory.");
-      }
-      Unmount();
-      return false;
-    }
-    return true;
   }
+  return true;
+}
 
-  QString EfiDirectory() const {
-    return Drive_ + QStringLiteral("\\EFI");
-  }
+QString PackagedFirmwarePath() {
+  return QDir::cleanPath(
+      QDir(QCoreApplication::applicationDirPath())
+          .filePath(QStringLiteral("../share/apex32/Apex32BootManager.efi")));
+}
 
- private:
-  void Unmount() {
-    if (!Mounted_) {
-      return;
+bool VerifyPackagedFirmware(QString *Path, QString *Error) {
+  if (!kHardwareInstallEnabled) {
+    if (Error != nullptr) {
+      *Error = QStringLiteral("This build is intentionally scan-only.");
     }
-    QString Ignored;
-    RunTool(
-        WindowsTool(QStringLiteral("mountvol.exe")),
-        {Drive_, QStringLiteral("/D")},
-        &Ignored);
-    Mounted_ = false;
-    Drive_.clear();
+    return false;
   }
+  const QString Candidate = PackagedFirmwarePath();
+  QFile File(Candidate);
+  if (!File.open(QIODevice::ReadOnly) || File.size() < 4096 ||
+      File.size() > (64 * 1024 * 1024)) {
+    if (Error != nullptr) {
+      *Error = QStringLiteral("The packaged APEX32 firmware is missing or invalid.");
+    }
+    return false;
+  }
+  const QByteArray Contents = File.readAll();
+  if (Contents.size() < 2 || Contents.at(0) != 'M' || Contents.at(1) != 'Z') {
+    if (Error != nullptr) {
+      *Error = QStringLiteral("The packaged firmware is not a PE/COFF image.");
+    }
+    return false;
+  }
+  const QByteArray Expected(APEX32_PACKAGED_FIRMWARE_SHA256);
+  const QByteArray Actual =
+      QCryptographicHash::hash(Contents, QCryptographicHash::Sha256).toHex();
+  if (Expected.size() != 64 || Actual.compare(Expected, Qt::CaseInsensitive) != 0) {
+    if (Error != nullptr) {
+      *Error = QStringLiteral("The packaged firmware checksum is not trusted.");
+    }
+    return false;
+  }
+  *Path = Candidate;
+  return true;
+}
 
-  QString Drive_;
-  bool Mounted_ = false;
-};
+std::string Capabilities() {
+  std::string Result =
+      "APEX32CAPS|1\n"
+      "SCAN|1\n"
+      "TRANSACTION|1\n";
+  Result += kHardwareInstallEnabled ? "INSTALL|1\nRESTORE|1\n"
+                                    : "INSTALL|0\nRESTORE|0\n";
+  Result += "UAC|1\n";
+  return Result;
+}
 
 class InstallerWindow final : public QMainWindow {
  public:
   InstallerWindow() {
     setWindowTitle(QStringLiteral("APEX32 Community Installer"));
-    resize(980, 650);
+    resize(1020, 700);
+    FirmwareReady_ = VerifyPackagedFirmware(&FirmwarePath_, &FirmwareError_);
 
     auto *Central = new QWidget(this);
     auto *Layout = new QVBoxLayout(Central);
@@ -231,27 +336,35 @@ class InstallerWindow final : public QMainWindow {
         Central);
     Brand->setObjectName(QStringLiteral("brand"));
     Brand->setAlignment(Qt::AlignCenter);
-    Status_ = new QLabel(
-        QStringLiteral(
-            "Select Scan Systems. Transaction recovery schema %1 is CI-qualified; "
-            "hardware writes remain locked.")
-            .arg(Apex32::WindowsInstaller::TransactionSchemaVersion()),
-        Central);
+    Status_ = new QLabel(Central);
     Status_->setWordWrap(true);
+    Status_->setText(
+        FirmwareReady_
+            ? QStringLiteral(
+                  "Select Scan Systems. Windows will request administrator "
+                  "approval once, then installation and recovery stay graphical.")
+            : QStringLiteral("Scan remains available. %1").arg(FirmwareError_));
     Scan_ = new QPushButton(QStringLiteral("Scan Systems"), Central);
-    Table_ = new QTableWidget(0, 2, Central);
+    Table_ = new QTableWidget(0, 3, Central);
     Table_->setHorizontalHeaderLabels(
-        {QStringLiteral("Operating System"), QStringLiteral("EFI Loader")});
+        {QStringLiteral("Use"),
+         QStringLiteral("Operating System"),
+         QStringLiteral("EFI Loader")});
     Table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    Table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    Table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    Table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     Table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     Table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     Install_ = new QPushButton(
-        QStringLiteral("Install and Make Default — hardware backend not yet qualified"),
+        kHardwareInstallEnabled
+            ? QStringLiteral("Install APEX32 and Make Default")
+            : QStringLiteral("Hardware installation disabled in this source build"),
         Central);
     Install_->setEnabled(false);
     Restore_ = new QPushButton(
-        QStringLiteral("Restore Previous Boot State — hardware backend not yet qualified"),
+        kHardwareInstallEnabled
+            ? QStringLiteral("Restore Previous Boot State")
+            : QStringLiteral("Hardware restore disabled in this source build"),
         Central);
     Restore_->setEnabled(false);
 
@@ -276,6 +389,8 @@ class InstallerWindow final : public QMainWindow {
         "QHeaderView::section { background: #101927; color: #74f6ff; padding: 8px; }"));
 
     connect(Scan_, &QPushButton::clicked, this, [this]() { StartScan(); });
+    connect(Install_, &QPushButton::clicked, this, [this]() { InstallSelected(); });
+    connect(Restore_, &QPushButton::clicked, this, [this]() { RestorePrevious(); });
   }
 
   void StartScan() {
@@ -294,7 +409,9 @@ class InstallerWindow final : public QMainWindow {
         QMessageBox::warning(
             this,
             QStringLiteral("Scan cancelled"),
-            QStringLiteral("Windows administrator approval is required to read the EFI System Partition."));
+            QStringLiteral(
+                "Windows administrator approval is required to read the EFI "
+                "System Partition and prepare installation."));
         return;
       }
       QCoreApplication::quit();
@@ -302,8 +419,11 @@ class InstallerWindow final : public QMainWindow {
     }
 
     Scan_->setEnabled(false);
+    Install_->setEnabled(false);
+    Restore_->setEnabled(false);
     Status_->setText(QStringLiteral("Scanning the EFI System Partition..."));
     Table_->setRowCount(0);
+    Loaders_.clear();
     QApplication::processEvents();
 
     QString Error;
@@ -315,7 +435,6 @@ class InstallerWindow final : public QMainWindow {
       return;
     }
 
-    QVector<Loader> Loaders;
     QSet<QString> Seen;
     QDirIterator Iterator(
         Mount.EfiDirectory(),
@@ -323,23 +442,28 @@ class InstallerWindow final : public QMainWindow {
         QDir::Files,
         QDirIterator::Subdirectories);
     const QDir EfiRoot(Mount.EfiDirectory());
-    while (Iterator.hasNext() && Loaders.size() < kMaximumLoaders) {
+    while (Iterator.hasNext() && Loaders_.size() < kMaximumLoaders) {
       const QString Absolute = Iterator.next();
       QString Relative = EfiRoot.relativeFilePath(Absolute);
       Relative.replace(QLatin1Char('/'), QLatin1Char('\\'));
       const QString DisplayPath = QStringLiteral("\\EFI\\") + Relative;
       const QString Lower = DisplayPath.toLower();
       if (Lower.startsWith(QStringLiteral("\\efi\\apex32\\")) ||
-          Seen.contains(Lower)) {
+          Seen.contains(Lower) || !SafeConfigurationField(DisplayPath, 159)) {
         continue;
       }
       Seen.insert(Lower);
-      Loaders.push_back({FriendlyName(DisplayPath), DisplayPath});
+      const QString Name = FriendlyName(DisplayPath);
+      Loaders_.push_back(
+          {Name,
+           DisplayPath,
+           IconName(Name),
+           !Name.contains(QStringLiteral("RECOVERY"))});
     }
 
     std::sort(
-        Loaders.begin(),
-        Loaders.end(),
+        Loaders_.begin(),
+        Loaders_.end(),
         [](const Loader &Left, const Loader &Right) {
           if (Left.Name == Right.Name) {
             return Left.Path < Right.Path;
@@ -347,38 +471,224 @@ class InstallerWindow final : public QMainWindow {
           return Left.Name < Right.Name;
         });
 
-    for (const Loader &Entry : Loaders) {
+    for (const Loader &Entry : Loaders_) {
       const int Row = Table_->rowCount();
       Table_->insertRow(Row);
-      Table_->setItem(Row, 0, new QTableWidgetItem(Entry.Name));
-      Table_->setItem(Row, 1, new QTableWidgetItem(Entry.Path));
+      auto *Use = new QCheckBox(Table_);
+      Use->setChecked(Entry.DefaultSelected);
+      Use->setStyleSheet(QStringLiteral("margin-left: 12px"));
+      Table_->setCellWidget(Row, 0, Use);
+      Table_->setItem(Row, 1, new QTableWidgetItem(Entry.Name));
+      Table_->setItem(Row, 2, new QTableWidgetItem(Entry.Path));
     }
+
+    RecoveryAvailable_ = QFileInfo(
+        QDir(Mount.RootDirectory())
+            .filePath(QStringLiteral("EFI/APEX32/recovery-state.json")))
+                             .isFile();
+    Install_->setEnabled(
+        kHardwareInstallEnabled && FirmwareReady_ && !Loaders_.isEmpty());
+    Restore_->setEnabled(kHardwareInstallEnabled && RecoveryAvailable_);
     Status_->setText(
         QStringLiteral(
-            "%1 EFI loaders found. Transactional rollback and restore pass in "
-            "a disposable ESP; the real Windows firmware backend remains locked.")
-            .arg(Loaders.size()));
+            "%1 EFI loaders found. Select the systems to display, then "
+            "install APEX32 as the first UEFI boot entry.")
+            .arg(Loaders_.size()));
     Scan_->setEnabled(true);
   }
 
  private:
+  QByteArray BuildConfiguration(QString *Error) const {
+    QByteArray Configuration("APEX32CFG|1\n");
+    int Selected = 0;
+    for (int Row = 0; Row < Table_->rowCount(); ++Row) {
+      const auto *Use = qobject_cast<QCheckBox *>(Table_->cellWidget(Row, 0));
+      if (Use == nullptr || !Use->isChecked()) {
+        continue;
+      }
+      if (++Selected > kMaximumSelectedLoaders) {
+        if (Error != nullptr) {
+          *Error = QStringLiteral("Select at most 32 EFI loaders.");
+        }
+        return {};
+      }
+      const Loader &Entry = Loaders_.at(Row);
+      if (!SafeConfigurationField(Entry.Name, 39) ||
+          !SafeConfigurationField(Entry.Path, 159) ||
+          !SafeConfigurationField(Entry.Icon, 15)) {
+        if (Error != nullptr) {
+          *Error = QStringLiteral("A selected EFI loader has unsafe metadata.");
+        }
+        return {};
+      }
+      Configuration += "ENTRY|";
+      Configuration += Entry.Name.toLatin1();
+      Configuration += '|';
+      Configuration += Entry.Path.toLatin1();
+      Configuration += '|';
+      Configuration += Entry.Icon.toLatin1();
+      Configuration += '\n';
+    }
+    if (Selected == 0) {
+      if (Error != nullptr) {
+        *Error = QStringLiteral("Select at least one operating system.");
+      }
+      return {};
+    }
+    return Configuration;
+  }
+
+  bool PrepareNativeStore(
+      Apex32::WindowsInstaller::WindowsFirmwareVariableAccess *Variables,
+      QString *Error) {
+    if (!Variables->Prepare(Error)) {
+      return false;
+    }
+    bool SecureBoot = false;
+    if (!Apex32::WindowsInstaller::ReadSecureBootState(
+            Variables, &SecureBoot, Error)) {
+      return false;
+    }
+    if (SecureBoot) {
+      if (Error != nullptr) {
+        *Error = QStringLiteral(
+            "Secure Boot is enabled. This unsigned Community beta refuses to "
+            "replace the default boot path. Use Restore if APEX32 was already "
+            "installed, or wait for a signed release.");
+      }
+      return false;
+    }
+    return true;
+  }
+
+  void InstallSelected() {
+    if (!kHardwareInstallEnabled || !FirmwareReady_) {
+      QMessageBox::critical(
+          this,
+          QStringLiteral("Installation unavailable"),
+          FirmwareError_.isEmpty()
+              ? QStringLiteral("This build cannot perform hardware installation.")
+              : FirmwareError_);
+      return;
+    }
+    QString Error;
+    const QByteArray Configuration = BuildConfiguration(&Error);
+    if (Configuration.isEmpty()) {
+      QMessageBox::warning(this, QStringLiteral("Selection required"), Error);
+      return;
+    }
+    if (QMessageBox::question(
+            this,
+            QStringLiteral("Install APEX32"),
+            QStringLiteral(
+                "APEX32 will copy its verified firmware to the EFI System "
+                "Partition and become first in UEFI BootOrder. The previous "
+                "files and exact boot order will be saved for graphical "
+                "Restore. Continue?")) != QMessageBox::Yes) {
+      return;
+    }
+
+    Install_->setEnabled(false);
+    Status_->setText(QStringLiteral("Installing APEX32 transactionally..."));
+    QApplication::processEvents();
+    EspMount Mount;
+    Apex32::WindowsInstaller::WindowsFirmwareVariableAccess Variables;
+    if (!Mount.Mount(&Error) || !PrepareNativeStore(&Variables, &Error)) {
+      Status_->setText(QStringLiteral("Installation was stopped safely."));
+      QMessageBox::critical(this, QStringLiteral("Installation stopped"), Error);
+      Install_->setEnabled(true);
+      return;
+    }
+    Apex32::WindowsInstaller::NativeFirmwareStore Store(&Variables);
+    Apex32::WindowsInstaller::TransactionEngine Engine(
+        Mount.RootDirectory(), &Store);
+    const Apex32::WindowsInstaller::TransactionResult Result =
+        Engine.Install(FirmwarePath_, Configuration);
+    if (!Result.Success) {
+      Status_->setText(QStringLiteral("Installation failed and was rolled back."));
+      QMessageBox::critical(
+          this, QStringLiteral("Installation failed"), Result.Message);
+      Install_->setEnabled(true);
+      return;
+    }
+    RecoveryAvailable_ = true;
+    Restore_->setEnabled(true);
+    Install_->setEnabled(true);
+    Status_->setText(
+        QStringLiteral("APEX32 is installed and first in UEFI BootOrder."));
+    QMessageBox::information(
+        this,
+        QStringLiteral("APEX32 installed"),
+        QStringLiteral(
+            "Installation and verification completed. Restart Windows when "
+            "ready to enter APEX32 Secure Gateway."));
+  }
+
+  void RestorePrevious() {
+    if (!kHardwareInstallEnabled || !RecoveryAvailable_) {
+      QMessageBox::information(
+          this,
+          QStringLiteral("No recovery state"),
+          QStringLiteral("No verified APEX32 recovery transaction is available."));
+      return;
+    }
+    if (QMessageBox::question(
+            this,
+            QStringLiteral("Restore previous boot state"),
+            QStringLiteral(
+                "Restore the exact pre-APEX32 BootOrder and recover or remove "
+                "the files created by the installer?")) != QMessageBox::Yes) {
+      return;
+    }
+
+    Restore_->setEnabled(false);
+    Status_->setText(QStringLiteral("Restoring the previous UEFI state..."));
+    QApplication::processEvents();
+    QString Error;
+    EspMount Mount;
+    Apex32::WindowsInstaller::WindowsFirmwareVariableAccess Variables;
+    if (!Mount.Mount(&Error) || !Variables.Prepare(&Error)) {
+      Status_->setText(QStringLiteral("Restore was stopped safely."));
+      QMessageBox::critical(this, QStringLiteral("Restore stopped"), Error);
+      Restore_->setEnabled(true);
+      return;
+    }
+    Apex32::WindowsInstaller::NativeFirmwareStore Store(&Variables);
+    Apex32::WindowsInstaller::TransactionEngine Engine(
+        Mount.RootDirectory(), &Store);
+    const Apex32::WindowsInstaller::TransactionResult Result = Engine.Restore();
+    if (!Result.Success) {
+      Status_->setText(QStringLiteral("Restore failed and retained recoverable state."));
+      QMessageBox::critical(this, QStringLiteral("Restore failed"), Result.Message);
+      Restore_->setEnabled(true);
+      return;
+    }
+    RecoveryAvailable_ = false;
+    Status_->setText(QStringLiteral("The previous EFI files and BootOrder were restored."));
+    QMessageBox::information(
+        this,
+        QStringLiteral("Previous boot state restored"),
+        QStringLiteral(
+            "APEX32 installation state was removed and the exact previous "
+            "UEFI boot order was restored."));
+  }
+
   QLabel *Status_ = nullptr;
   QPushButton *Scan_ = nullptr;
   QTableWidget *Table_ = nullptr;
   QPushButton *Install_ = nullptr;
   QPushButton *Restore_ = nullptr;
+  QVector<Loader> Loaders_;
+  QString FirmwarePath_;
+  QString FirmwareError_;
+  bool FirmwareReady_ = false;
+  bool RecoveryAvailable_ = false;
 };
 
 }  // namespace
 
 int main(int argc, char **argv) {
-  constexpr std::string_view Capabilities =
-      "APEX32CAPS|1\n"
-      "SCAN|1\n"
-      "TRANSACTION|1\n"
-      "INSTALL|0\n"
-      "RESTORE|0\n"
-      "UAC|1\n";
+  const std::string CapabilityText = Capabilities();
   int CapabilityFileIndex = -1;
   bool PrintCapabilities = false;
   for (int Index = 1; Index < argc; ++Index) {
@@ -390,16 +700,16 @@ int main(int argc, char **argv) {
     }
   }
   if (CapabilityFileIndex >= 0 && CapabilityFileIndex + 1 < argc) {
-    std::ofstream File(argv[CapabilityFileIndex + 1],
-                       std::ios::binary | std::ios::trunc);
+    std::ofstream File(
+        argv[CapabilityFileIndex + 1], std::ios::binary | std::ios::trunc);
     if (!File) {
       return 2;
     }
-    File << Capabilities;
+    File << CapabilityText;
     return 0;
   }
   if (PrintCapabilities) {
-    std::cout << Capabilities;
+    std::cout << CapabilityText;
     return 0;
   }
 
