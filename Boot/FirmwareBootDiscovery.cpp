@@ -410,11 +410,14 @@ EFI_STATUS FirmwareBootDiscovery::Discover(
   UINT16 Seen[kSeenBootNumberCapacity]{};
   UINTN SeenCount = 0U;
   EFI_STATUS LastError = EFI_NOT_FOUND;
+  CHAR16 BootOrderName[] = {
+      'B', 'o', 'o', 't', 'O', 'r', 'd', 'e', 'r', 0,
+  };
   alignas(8) UINT8 BootOrder[kBootOrderCapacity]{};
   UINTN BootOrderSize = sizeof(BootOrder);
   UINT32 Attributes = 0U;
   const EFI_STATUS OrderStatus = gRT->GetVariable(
-      const_cast<CHAR16*>(L"BootOrder"),
+      BootOrderName,
       &gEfiGlobalVariableGuid,
       &Attributes,
       &BootOrderSize,
