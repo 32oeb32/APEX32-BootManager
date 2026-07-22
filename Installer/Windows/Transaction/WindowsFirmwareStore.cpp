@@ -234,9 +234,10 @@ bool BuildApexLoadOption(
 }
 
 QString BootVariableName(int Number) {
-  return QStringLiteral("Boot%1")
-      .arg(Number, 4, 16, QLatin1Char('0'))
-      .toUpper();
+  const QString HexNumber = QString::number(Number, 16)
+                                .rightJustified(4, QLatin1Char('0'))
+                                .toUpper();
+  return QStringLiteral("Boot%1").arg(HexNumber);
 }
 
 bool DecodeBootOrder(
