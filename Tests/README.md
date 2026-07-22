@@ -11,7 +11,8 @@ stubs with AddressSanitizer and UndefinedBehaviorSanitizer. It validates:
 
 - the complete intro and manual-only menu lifecycle;
 - schema 1 configuration loading from the canonical ESP path;
-- bounded `BootOrder`/`Boot####` parsing, ordering, filtering, and fallback;
+- bounded `BootOrder`/`Boot####` parsing, `BootCurrent` self-filtering,
+  ordering, and fallback;
 - exact configured loader probes;
 - dynamic card navigation and F2 diagnostics;
 - both simulated `LoadImage()` / `StartImage()` handoffs;

@@ -90,6 +90,8 @@ EFI_INPUT_KEY KeySequence[] = {
 UINTN NextKeyIndex = 0;
 
 UINT8 RuntimeBootOrder[] = {0x05U, 0x00U, 0x06U, 0x00U, 0x07U, 0x00U};
+BOOLEAN RuntimeBootCurrentAvailable = FALSE;
+UINT8 RuntimeBootCurrent[] = {0x00U, 0x00U};
 alignas(8) UINT8 RuntimeOption5[1024]{};
 alignas(8) UINT8 RuntimeOption6[1024]{};
 alignas(8) UINT8 RuntimeOption7[1024]{};
@@ -329,6 +331,9 @@ EFI_STATUS EFIAPI RuntimeGetVariable(
   constexpr CHAR16 kBootOrder[] = {
       'B', 'o', 'o', 't', 'O', 'r', 'd', 'e', 'r', 0,
   };
+  constexpr CHAR16 kBootCurrent[] = {
+      'B', 'o', 'o', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', 0,
+  };
   constexpr CHAR16 kBoot0005[] = {
       'B', 'o', 'o', 't', '0', '0', '0', '5', 0,
   };
@@ -349,6 +354,10 @@ EFI_STATUS EFIAPI RuntimeGetVariable(
   if (MatchesPath(VariableName, kBootOrder)) {
     Source = RuntimeBootOrder;
     SourceSize = sizeof(RuntimeBootOrder);
+  } else if (MatchesPath(VariableName, kBootCurrent) &&
+             RuntimeBootCurrentAvailable) {
+    Source = RuntimeBootCurrent;
+    SourceSize = sizeof(RuntimeBootCurrent);
   } else if (MatchesPath(VariableName, kBoot0005)) {
     Source = RuntimeOption5;
     SourceSize = RuntimeOption5Size;
@@ -755,6 +764,23 @@ void WriteUint16(UINT8* Buffer, const UINTN Offset, const UINT16 Value) {
       FirmwareConfiguration.Entries[0].FirmwareBootNumber == 0x0006U &&
           FirmwareConfiguration.Entries[1].FirmwareBootNumber == 0x0008U,
       "APEX32 self entries and inactive options must be excluded");
+
+  RuntimeBootCurrent[0] = 0x06U;
+  RuntimeBootCurrent[1] = 0x00U;
+  RuntimeBootCurrentAvailable = TRUE;
+  apex32::BootConfiguration CurrentFilteredConfiguration{};
+  gRT = &RuntimeServices;
+  const EFI_STATUS CurrentFilteredStatus =
+      apex32::FirmwareBootDiscovery::Discover(&CurrentFilteredConfiguration);
+  gRT = nullptr;
+  RuntimeBootCurrentAvailable = FALSE;
+  Passed &= Check(
+      CurrentFilteredStatus == EFI_SUCCESS &&
+          CurrentFilteredConfiguration.FirmwareCount == 1U &&
+          CurrentFilteredConfiguration.Count == 1U &&
+          CurrentFilteredConfiguration.Entries[0].FirmwareBootNumber ==
+              0x0008U,
+      "BootCurrent must be excluded to prevent recursive self-launch");
 
   gRT = &RuntimeServices;
   const apex32::BootConfiguration MergedConfiguration =

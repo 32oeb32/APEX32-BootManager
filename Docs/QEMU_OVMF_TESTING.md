@@ -76,7 +76,8 @@ new NVRAM entry.
 
 The native-discovery pass seeds private APEX32, Linux, Windows, and unknown
 `Boot####` options in the disposable variable store. APEX32 must exclude its
-own option, retain the unknown option as a generic card, select `Boot7A33`, and
+own option and the read-only `BootCurrent` option that launched it, retain the
+unknown option as a generic card, select `Boot7A33`, and
 launch the Linux signature payload using the complete device path stored in
 that firmware variable. The host's NVRAM and ESP remain unreachable.
 

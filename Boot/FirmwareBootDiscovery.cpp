@@ -290,6 +290,8 @@ void FormatFallbackName(
 
 void TryAppendBootOption(
     const UINT16 BootNumber,
+    const BOOLEAN CurrentBootNumberKnown,
+    const UINT16 CurrentBootNumber,
     UINT16* Seen,
     UINTN* SeenCount,
     BootConfiguration* Configuration,
@@ -303,6 +305,13 @@ void TryAppendBootOption(
   }
   Seen[*SeenCount] = BootNumber;
   ++(*SeenCount);
+
+  // BootCurrent identifies the firmware option that launched this image.
+  // Presenting it as a card can recursively start APEX32 again when a vendor
+  // option resolves through the removable-media fallback path.
+  if (CurrentBootNumberKnown && (BootNumber == CurrentBootNumber)) {
+    return;
+  }
 
   CHAR16 VariableName[9]{};
   FormatBootVariableName(BootNumber, VariableName);
@@ -410,6 +419,26 @@ EFI_STATUS FirmwareBootDiscovery::Discover(
   UINT16 Seen[kSeenBootNumberCapacity]{};
   UINTN SeenCount = 0U;
   EFI_STATUS LastError = EFI_NOT_FOUND;
+  CHAR16 BootCurrentName[] = {
+      'B', 'o', 'o', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', 0,
+  };
+  UINT8 BootCurrentBuffer[sizeof(UINT16)]{};
+  UINTN BootCurrentSize = sizeof(BootCurrentBuffer);
+  UINT32 BootCurrentAttributes = 0U;
+  const EFI_STATUS CurrentStatus = gRT->GetVariable(
+      BootCurrentName,
+      &gEfiGlobalVariableGuid,
+      &BootCurrentAttributes,
+      &BootCurrentSize,
+      BootCurrentBuffer);
+  const BOOLEAN CurrentBootNumberKnown =
+      (!EFI_ERROR(CurrentStatus) &&
+       (BootCurrentSize == sizeof(BootCurrentBuffer)))
+          ? TRUE
+          : FALSE;
+  const UINT16 CurrentBootNumber = CurrentBootNumberKnown
+                                       ? ReadUint16(BootCurrentBuffer)
+                                       : 0U;
   CHAR16 BootOrderName[] = {
       'B', 'o', 'o', 't', 'O', 'r', 'd', 'e', 'r', 0,
   };
@@ -429,6 +458,8 @@ EFI_STATUS FirmwareBootDiscovery::Discover(
          Offset += 2U) {
       TryAppendBootOption(
           ReadUint16(BootOrder + Offset),
+          CurrentBootNumberKnown,
+          CurrentBootNumber,
           Seen,
           &SeenCount,
           Configuration,
@@ -459,6 +490,8 @@ EFI_STATUS FirmwareBootDiscovery::Discover(
         ParseBootVariableName(VariableName, &BootNumber)) {
       TryAppendBootOption(
           BootNumber,
+          CurrentBootNumberKnown,
+          CurrentBootNumber,
           Seen,
           &SeenCount,
           Configuration,
