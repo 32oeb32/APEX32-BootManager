@@ -34,7 +34,9 @@ constexpr auto kInstalledFirmwarePath =
 
   int Entries = 0;
   const QList<QByteArray> AllowedIcons = {
-      "generic", "linux", "windows", "kali", "blackarch"};
+      "generic", "linux", "windows", "kali", "blackarch", "ubuntu",
+      "fedora", "arch", "debian", "mint", "opensuse", "popos",
+      "opencore", "recovery", "usb", "network"};
   for (qsizetype Index = 1; Index < Lines.size(); ++Index) {
     const QByteArray Line = Lines.at(Index).trimmed();
     if (Line.isEmpty()) {
@@ -42,10 +44,10 @@ constexpr auto kInstalledFirmwarePath =
     }
     const QList<QByteArray> Fields = Line.split('|');
     if (Fields.size() != 4 || Fields.at(0) != "ENTRY" ||
-        Fields.at(1).isEmpty() || Fields.at(1).size() > 80 ||
+        Fields.at(1).isEmpty() || Fields.at(1).size() > 39 ||
         !Fields.at(2).startsWith("\\EFI\\") ||
         !Fields.at(2).toLower().endsWith(".efi") ||
-        Fields.at(2).size() > 512 || Fields.at(2).contains("..") ||
+        Fields.at(2).size() > 159 || Fields.at(2).contains("..") ||
         Fields.at(2).contains('/') ||
         !AllowedIcons.contains(Fields.at(3))) {
       *Error = QStringLiteral("configuration entry is invalid");
@@ -60,8 +62,8 @@ constexpr auto kInstalledFirmwarePath =
     }
     ++Entries;
   }
-  if (Entries < 1 || Entries > 8) {
-    *Error = QStringLiteral("configuration must contain one to eight entries");
+  if (Entries < 1 || Entries > 32) {
+    *Error = QStringLiteral("configuration must contain one to 32 entries");
     return false;
   }
   return true;

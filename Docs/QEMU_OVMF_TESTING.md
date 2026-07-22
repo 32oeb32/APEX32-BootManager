@@ -4,6 +4,9 @@ The OVMF visual smoke test boots the real APEX32 PE/COFF application in a
 temporary virtual machine. It does not simulate the renderer with host stubs.
 The test waits for the APEX32 gateway, captures the virtual framebuffer through
 QEMU's machine protocol, and verifies the dark, cyan, and red interface palette.
+It also requires accent pixels in the central scene region, so a stray colored
+pixel or fully black frame cannot satisfy the gate. Validation is regional and
+threshold-based rather than fragile exact screenshot matching.
 
 The test is isolated from the workstation:
 
@@ -12,6 +15,8 @@ The test is isolated from the workstation:
 - it does not mount, read, or modify the host ESP;
 - it cannot change the host `BootOrder`; and
 - it removes the virtual ESP and variable store when finished.
+
+The graphics-foundation branch and PR #4 never invoke the hardware installer.
 
 ## Local prerequisites
 

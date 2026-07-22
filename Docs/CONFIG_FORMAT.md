@@ -22,10 +22,15 @@ Each `ENTRY` contains:
 
 1. display name: printable ASCII, 1–39 characters;
 2. absolute EFI path: printable ASCII, starts with `\`, up to 159 characters;
-3. icon identifier: `generic`, `linux`, `windows`, `kali`, or `blackarch`.
+3. icon identifier: `generic`, `linux`, `windows`, `kali`, `blackarch`,
+   `ubuntu`, `fedora`, `arch`, `debian`, `mint`, `opensuse`, `popos`,
+   `opencore`, `recovery`, `usb`, or `network`.
 
 Unknown icon identifiers deliberately fall back to the generic EFI mark.
-Schema 1 supports at most eight entries and same-ESP paths. A malformed file
+Known vendor names and paths can refine a generic Linux identity without
+changing renderer code. Schema 1 supports at most 32 entries and same-ESP
+paths. The menu displays up to four cards per page and keeps every additional
+entry reachable through keyboard navigation. A malformed file
 is rejected as a whole; the firmware never attempts to boot a partially parsed
 configuration.
 

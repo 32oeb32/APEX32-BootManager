@@ -4,3 +4,5 @@ APEX32CFG|1
 ENTRY|KALI LINUX|\EFI\kali\grubx64.efi|kali
 ENTRY|BLACKARCH LINUX|\EFI\BlackArch_Linux\grubx64.efi|blackarch
 ENTRY|WINDOWS BOOT MANAGER|\EFI\Microsoft\Boot\bootmgfw.efi|windows
+ENTRY|UBUNTU|\EFI\ubuntu\shimx64.efi|ubuntu
+ENTRY|UNKNOWN EFI LOADER|\EFI\vendor\bootx64.efi|generic

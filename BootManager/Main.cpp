@@ -6,8 +6,9 @@
 
 namespace {
 
-constexpr CHAR8 kFailureMessage[] =
-    "APEX32 Boot Manager: graphics initialization failed.\r\n";
+constexpr CHAR8 kFailurePrefix[] =
+    "APEX32 Boot Manager: initialization failed, EFI status 0x";
+constexpr CHAR8 kHexDigits[] = "0123456789ABCDEF";
 
 void SetCursorVisibility(
     EFI_SYSTEM_TABLE* SystemTable,
@@ -18,13 +19,34 @@ void SetCursorVisibility(
   }
 }
 
-void ReportFailure(EFI_SYSTEM_TABLE* SystemTable) noexcept {
+void ReportFailure(
+    EFI_SYSTEM_TABLE* SystemTable,
+    const EFI_STATUS Status) noexcept {
   if ((SystemTable != nullptr) && (SystemTable->ConOut != nullptr) &&
       (SystemTable->ConOut->OutputString != nullptr)) {
-    CHAR16 FailureMessage[sizeof(kFailureMessage)];
-    for (UINTN Index = 0; Index < sizeof(kFailureMessage); ++Index) {
-      FailureMessage[Index] = static_cast<CHAR16>(kFailureMessage[Index]);
+    CHAR16 FailureMessage[96]{};
+    UINTN Offset = 0U;
+    for (UINTN Index = 0U;
+         (kFailurePrefix[Index] != '\0') &&
+         ((Offset + 1U) < (sizeof(FailureMessage) / sizeof(FailureMessage[0])));
+         ++Index) {
+      FailureMessage[Offset++] = static_cast<CHAR16>(kFailurePrefix[Index]);
     }
+    for (UINTN Nibble = 0U;
+         (Nibble < (sizeof(EFI_STATUS) * 2U)) &&
+         ((Offset + 1U) < (sizeof(FailureMessage) / sizeof(FailureMessage[0])));
+         ++Nibble) {
+      const UINTN Shift =
+          ((sizeof(EFI_STATUS) * 2U) - Nibble - 1U) * 4U;
+      FailureMessage[Offset++] = static_cast<CHAR16>(
+          kHexDigits[(Status >> Shift) & 0xFU]);
+    }
+    if ((Offset + 2U) <
+        (sizeof(FailureMessage) / sizeof(FailureMessage[0]))) {
+      FailureMessage[Offset++] = static_cast<CHAR16>('\r');
+      FailureMessage[Offset++] = static_cast<CHAR16>('\n');
+    }
+    FailureMessage[Offset] = 0U;
 
     SystemTable->ConOut->OutputString(
         SystemTable->ConOut,
@@ -42,6 +64,9 @@ extern "C" EFI_STATUS EFIAPI UefiMain(
   apex32::GopRenderer Renderer;
   EFI_STATUS Status = Renderer.Initialize();
   if (!EFI_ERROR(Status)) {
+    Status = Renderer.EnableLogicalCanvas();
+  }
+  if (!EFI_ERROR(Status)) {
     Status = apex32::IntroAnimation::Play(Renderer);
   }
   if (!EFI_ERROR(Status)) {
@@ -54,7 +79,7 @@ extern "C" EFI_STATUS EFIAPI UefiMain(
   SetCursorVisibility(SystemTable, TRUE);
 
   if (EFI_ERROR(Status)) {
-    ReportFailure(SystemTable);
+    ReportFailure(SystemTable, Status);
   }
 
   return Status;

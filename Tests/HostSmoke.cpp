@@ -13,6 +13,11 @@ extern "C" {
 #include <cstring>
 
 #include "Boot/BootDiscovery.hpp"
+#include "Assets/OsIdentity.hpp"
+#include "Menu/CardLayout.hpp"
+#include "Renderer/Color.hpp"
+#include "Renderer/GopRenderer.hpp"
+#include "Renderer/LogicalCanvas.hpp"
 
 extern "C" EFI_STATUS EFIAPI UefiMain(
     EFI_HANDLE ImageHandle,
@@ -59,6 +64,9 @@ struct SmokeState {
 };
 
 SmokeState State{};
+EFI_GRAPHICS_OUTPUT_BLT_PIXEL CapturedFrame[64]{};
+UINTN CapturedWidth = 0U;
+UINTN CapturedHeight = 0U;
 
 EFI_INPUT_KEY KeySequence[] = {
     {SCAN_F2, 0},
@@ -142,6 +150,9 @@ EFI_GRAPHICS_OUTPUT_MODE_INFORMATION ModeInfo{
     0,
     1920,
     1080,
+    0,
+    {},
+    1920,
 };
 
 EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE Mode{
@@ -166,6 +177,14 @@ EFI_STATUS EFIAPI PresentFrame(
       (Height != ModeInfo.VerticalResolution) ||
       (Delta != Width * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL))) {
     return EFI_UNSUPPORTED;
+  }
+
+  CapturedWidth = Width;
+  CapturedHeight = Height;
+  if ((Width <= 8U) && (Height <= 8U)) {
+    for (UINTN Index = 0U; Index < (Width * Height); ++Index) {
+      CapturedFrame[Index] = Buffer[Index];
+    }
   }
 
   UINTN ColoredPixels = 0;
@@ -474,6 +493,233 @@ extern "C" VOID* SetMem(
   return std::memset(Buffer, Value, Length);
 }
 
+[[nodiscard]] bool RunGraphicsFoundationTests() {
+  bool Passed = true;
+
+  apex32::LogicalViewport Viewport{};
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(1920U, 1080U, &Viewport) ==
+          EFI_SUCCESS &&
+          Viewport.Valid && (Viewport.X == 0U) && (Viewport.Y == 0U) &&
+          (Viewport.Width == 1920U) && (Viewport.Height == 1080U),
+      "1920x1080 must map to the complete logical canvas");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(800U, 600U, &Viewport) ==
+          EFI_SUCCESS &&
+          (Viewport.X == 0U) && (Viewport.Y == 75U) &&
+          (Viewport.Width == 800U) && (Viewport.Height == 450U),
+      "800x600 must use centered vertical letterboxing");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(1024U, 768U, &Viewport) ==
+          EFI_SUCCESS &&
+          (Viewport.X == 0U) && (Viewport.Y == 96U) &&
+          (Viewport.Width == 1024U) && (Viewport.Height == 576U),
+      "1024x768 must preserve 16:9 content with vertical letterboxing");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(1280U, 720U, &Viewport) ==
+          EFI_SUCCESS &&
+          (Viewport.X == 0U) && (Viewport.Y == 0U) &&
+          (Viewport.Width == 1280U) && (Viewport.Height == 720U),
+      "1280x720 must use the complete physical canvas");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(800U, 600U, &Viewport) ==
+          EFI_SUCCESS,
+      "800x600 viewport must remain available for mapping checks");
+
+  UINTN X = 0U;
+  UINTN Y = 0U;
+  UINTN Width = 0U;
+  UINTN Height = 0U;
+  Passed &= Check(
+      apex32::LogicalCanvas::MapRectangle(
+          Viewport,
+          0U,
+          0U,
+          apex32::kReferenceCanvasWidth,
+          apex32::kReferenceCanvasHeight,
+          &X,
+          &Y,
+          &Width,
+          &Height) &&
+          (X == 0U) && (Y == 75U) && (Width == 800U) &&
+          (Height == 450U),
+      "logical full-screen rectangle must map exactly to the viewport");
+  Passed &= Check(
+      !apex32::LogicalCanvas::MapRectangle(
+          Viewport,
+          apex32::kReferenceCanvasWidth,
+          0U,
+          1U,
+          1U,
+          &X,
+          &Y,
+          &Width,
+          &Height),
+      "logical rectangles outside the reference canvas must be rejected");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(2560U, 1080U, &Viewport) ==
+          EFI_SUCCESS &&
+          (Viewport.X == 320U) && (Viewport.Y == 0U) &&
+          (Viewport.Width == 1920U) && (Viewport.Height == 1080U),
+      "ultrawide modes must use centered horizontal letterboxing");
+  Passed &= Check(
+      EFI_ERROR(apex32::LogicalCanvas::CreateViewport(0U, 1080U, &Viewport)),
+      "zero-width framebuffers must be rejected");
+  Passed &= Check(
+      apex32::LogicalCanvas::CreateViewport(MAX_UINTN, 2U, &Viewport) ==
+          EFI_BAD_BUFFER_SIZE,
+      "overflowing viewport calculations must fail closed");
+
+  const apex32::CardPageLayout OneCard =
+      apex32::CardLayout::Calculate(1U, 0U);
+  Passed &= Check(
+      OneCard.Valid && !OneCard.Compact &&
+          (OneCard.VisibleStart == 0U) && (OneCard.VisibleCount == 1U) &&
+          (OneCard.Cards[0].X == 560U),
+      "one-card layout must center the selected operating system");
+  const apex32::CardPageLayout ThreeCards =
+      apex32::CardLayout::Calculate(3U, 2U);
+  Passed &= Check(
+      ThreeCards.Valid && ThreeCards.Compact &&
+          (ThreeCards.VisibleCount == 3U) &&
+          (ThreeCards.Cards[2].X == 560U) &&
+          (ThreeCards.Cards[2].Y == 520U),
+      "three-card layout must center the final compact card");
+  const apex32::CardPageLayout LaterPage =
+      apex32::CardLayout::Calculate(9U, 5U);
+  Passed &= Check(
+      LaterPage.Valid && (LaterPage.VisibleStart == 4U) &&
+          (LaterPage.VisibleCount == 4U),
+      "many-entry layout must page in bounded groups of four");
+  Passed &= Check(
+      !apex32::CardLayout::Calculate(8U, 8U).Valid,
+      "card layout must reject an out-of-range focused index");
+
+  apex32::BootEntry Fedora{};
+  std::strcpy(Fedora.Name, "FEDORA LINUX");
+  Fedora.Icon = apex32::OsIcon::Linux;
+  Passed &= Check(
+      apex32::osidentity::Resolve(Fedora).Icon == apex32::OsIcon::Fedora,
+      "generic Linux cards must resolve known identities from their names");
+  apex32::BootEntry Unknown{};
+  std::strcpy(Unknown.Name, "MYSTERY EFI LOADER");
+  Unknown.Icon = apex32::OsIcon::Generic;
+  Passed &= Check(
+      apex32::osidentity::Resolve(Unknown).Icon == apex32::OsIcon::Generic,
+      "unknown EFI loaders must retain the premium generic identity");
+  Passed &= Check(
+      (apex32::osidentity::ParseToken("ubuntu", 6U) ==
+       apex32::OsIcon::Ubuntu) &&
+          (apex32::osidentity::ParseToken("popos", 5U) ==
+           apex32::OsIcon::PopOs) &&
+          (apex32::osidentity::ParseToken("network", 7U) ==
+           apex32::OsIcon::Network),
+      "the pluggable registry must parse extended OS icon tokens");
+
+  constexpr apex32::RgbColor kBackground{10U, 20U, 30U};
+  constexpr apex32::RgbaColor kHalfWhite{255U, 255U, 255U, 128U};
+  constexpr apex32::RgbColor kBlended =
+      apex32::BlendColor(kBackground, kHalfWhite);
+  static_assert(
+      (kBlended.Red == 133U) && (kBlended.Green == 138U) &&
+          (kBlended.Blue == 143U),
+      "alpha blending must use stable rounded integer arithmetic");
+
+  ModeInfo.HorizontalResolution = 8U;
+  ModeInfo.VerticalResolution = 6U;
+  ModeInfo.PixelsPerScanLine = 10U;
+  apex32::GopRenderer Renderer;
+  Passed &= Check(
+      Renderer.Initialize() == EFI_SUCCESS,
+      "renderer must initialize a bounded canonical GOP back buffer");
+  Passed &= Check(
+      (Renderer.Width() == 8U) && (Renderer.Height() == 6U) &&
+          (Renderer.PixelsPerScanLine() == 10U),
+      "renderer must retain resolution and GOP scan-line metadata");
+
+  Renderer.Clear(kBackground);
+  Renderer.PutPixel(MAX_UINTN, MAX_UINTN, {255U, 255U, 255U});
+  Renderer.FillRectangle(7U, 5U, MAX_UINTN, MAX_UINTN, {255U, 0U, 0U});
+  Renderer.BlendPixel(0U, 0U, kHalfWhite);
+  Renderer.DrawRectangle(2U, 1U, 4U, 4U, 1U, {0U, 255U, 0U});
+  Renderer.FillGradient(
+      2U,
+      0U,
+      4U,
+      1U,
+      {0U, 0U, 255U},
+      {255U, 0U, 0U},
+      apex32::GradientDirection::Horizontal);
+  Passed &= Check(
+      Renderer.MeasureText("APEX32", 2U) == 70U,
+      "text measurement must match the embedded 5x7 font geometry");
+  Passed &= Check(
+      Renderer.MeasureText("A", MAX_UINTN) == 0U,
+      "overflowing text scales must be rejected");
+  Passed &= Check(
+      Renderer.Present() == EFI_SUCCESS,
+      "renderer must present its canonical BLT buffer through GOP");
+  Passed &= Check(
+      (CapturedWidth == 8U) && (CapturedHeight == 6U),
+      "test framebuffer must capture the complete rendered frame");
+  Passed &= Check(
+      (CapturedFrame[0].Red == 133U) &&
+          (CapturedFrame[0].Green == 138U) &&
+          (CapturedFrame[0].Blue == 143U),
+      "alpha output must be written to the canonical GOP color channels");
+  Passed &= Check(
+      (CapturedFrame[2U].Blue == 255U) &&
+          (CapturedFrame[5U].Red == 255U),
+      "horizontal gradient endpoints must be preserved");
+  Passed &= Check(
+      CapturedFrame[(1U * 8U) + 2U].Green == 255U,
+      "rectangle borders must render inside the requested bounds");
+  Passed &= Check(
+      (CapturedFrame[(2U * 8U) + 3U].Red == kBackground.Red) &&
+          (CapturedFrame[(2U * 8U) + 3U].Green == kBackground.Green) &&
+          (CapturedFrame[(2U * 8U) + 3U].Blue == kBackground.Blue),
+      "rectangle interiors must remain unchanged");
+  Passed &= Check(
+      CapturedFrame[(5U * 8U) + 7U].Red == 255U,
+      "oversized rectangles must clip to the final framebuffer pixel");
+  Renderer.Clear({0U, 0U, 0U});
+  Renderer.DrawTextAligned(
+      "A", 7U, 0U, 1U, {255U, 255U, 255U},
+      apex32::TextAlignment::Right);
+  Passed &= Check(
+      Renderer.Present() == EFI_SUCCESS &&
+          (CapturedFrame[3U].Red == 255U) &&
+          (CapturedFrame[4U].Red == 255U) &&
+          (CapturedFrame[5U].Red == 255U) &&
+          (CapturedFrame[2U].Red == 0U) &&
+          (CapturedFrame[6U].Red == 0U),
+      "right-aligned text must use measured embedded-font bounds");
+  Renderer.Shutdown();
+
+  ModeInfo.HorizontalResolution = 0U;
+  ModeInfo.VerticalResolution = 6U;
+  ModeInfo.PixelsPerScanLine = 0U;
+  Passed &= Check(
+      Renderer.Initialize() == EFI_UNSUPPORTED,
+      "unsupported zero-dimension GOP modes must fail safely");
+  ModeInfo.HorizontalResolution = MAX_UINTN;
+  ModeInfo.VerticalResolution = 2U;
+  ModeInfo.PixelsPerScanLine = MAX_UINTN;
+  Passed &= Check(
+      Renderer.Initialize() == EFI_BAD_BUFFER_SIZE,
+      "overflowing GOP buffer dimensions must fail safely");
+
+  ModeInfo.HorizontalResolution = 1920U;
+  ModeInfo.VerticalResolution = 1080U;
+  ModeInfo.PixelsPerScanLine = 1920U;
+  State = {};
+  NextKeyIndex = 0U;
+  CapturedWidth = 0U;
+  CapturedHeight = 0U;
+  std::memset(CapturedFrame, 0, sizeof(CapturedFrame));
+  return Passed;
+}
+
 int main() {
   EFI_BOOT_SERVICES BootServices{
       Stall,
@@ -485,6 +731,8 @@ int main() {
       UnloadImage,
   };
   gBS = &BootServices;
+
+  bool Passed = RunGraphicsFoundationTests();
 
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL TextOutput{};
   TextOutput.OutputString = OutputString;
@@ -499,7 +747,6 @@ int main() {
 
   const EFI_STATUS Status = UefiMain(ParentImageHandle, &SystemTable);
 
-  bool Passed = true;
   Passed &= Check(Status == EFI_SUCCESS, "UefiMain must succeed");
   Passed &= Check(
       State.FrameCount == 67,
@@ -622,6 +869,54 @@ int main() {
   Passed &= Check(
       ParsedConfiguration.Entries[2].Icon == apex32::OsIcon::Generic,
       "unknown icon identifier must fall back safely");
+
+  CHAR8 ManyEntries[12288]{};
+  UINTN ManyEntriesSize = 0U;
+  constexpr CHAR8 kManyHeader[] = "APEX32CFG|1\n";
+  std::memcpy(
+      ManyEntries, kManyHeader, sizeof(kManyHeader) - 1U);
+  ManyEntriesSize = sizeof(kManyHeader) - 1U;
+  for (UINTN Index = 0U; Index < apex32::kMaximumBootEntries; ++Index) {
+    const int Written = std::snprintf(
+        ManyEntries + ManyEntriesSize,
+        sizeof(ManyEntries) - ManyEntriesSize,
+        "ENTRY|SYSTEM %zu|\\EFI\\vendor%zu\\bootx64.efi|generic\n",
+        static_cast<std::size_t>(Index + 1U),
+        static_cast<std::size_t>(Index + 1U));
+    Passed &= Check(
+        (Written > 0) &&
+            (static_cast<UINTN>(Written) <
+             (sizeof(ManyEntries) - ManyEntriesSize)),
+        "many-entry test configuration must fit its bounded buffer");
+    if (Written <= 0) {
+      break;
+    }
+    ManyEntriesSize += static_cast<UINTN>(Written);
+  }
+  apex32::BootConfiguration ManyParsed{};
+  Passed &= Check(
+      (apex32::BootConfig::ParseAscii(
+           ManyEntries, ManyEntriesSize, &ManyParsed) == EFI_SUCCESS) &&
+          (ManyParsed.Count == apex32::kMaximumBootEntries),
+      "configuration must support dozens of dynamically generated cards");
+  const int ExtraWritten = std::snprintf(
+      ManyEntries + ManyEntriesSize,
+      sizeof(ManyEntries) - ManyEntriesSize,
+      "ENTRY|OVERFLOW|\\EFI\\overflow\\bootx64.efi|generic\n");
+  Passed &= Check(
+      (ExtraWritten > 0) &&
+          (static_cast<UINTN>(ExtraWritten) <
+           (sizeof(ManyEntries) - ManyEntriesSize)),
+      "overflow-entry test data must fit its host buffer");
+  if (ExtraWritten > 0) {
+    ManyEntriesSize += static_cast<UINTN>(ExtraWritten);
+    apex32::BootConfiguration RejectedMany{};
+    Passed &= Check(
+        apex32::BootConfig::ParseAscii(
+            ManyEntries, ManyEntriesSize, &RejectedMany) ==
+            EFI_BAD_BUFFER_SIZE,
+        "configuration beyond the bounded card limit must fail closed");
+  }
 
   constexpr CHAR8 kMalformedConfiguration[] =
       "ENTRY|UNTRUSTED|\\EFI\\bad.efi|generic\n";

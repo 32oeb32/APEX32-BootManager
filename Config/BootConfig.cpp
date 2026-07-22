@@ -1,53 +1,10 @@
 #include "Config/BootConfig.hpp"
 
+#include "Assets/OsIdentity.hpp"
+
 namespace apex32 {
 
 namespace {
-
-[[nodiscard]] BOOLEAN EqualsIgnoreCase(
-    const CHAR8* Left,
-    const UINTN LeftLength,
-    const CHAR8* Right) noexcept {
-  if ((Left == nullptr) || (Right == nullptr)) {
-    return FALSE;
-  }
-
-  UINTN Index = 0;
-  while ((Index < LeftLength) && (Right[Index] != '\0')) {
-    CHAR8 LeftCharacter = Left[Index];
-    CHAR8 RightCharacter = Right[Index];
-    if ((LeftCharacter >= 'a') && (LeftCharacter <= 'z')) {
-      LeftCharacter = static_cast<CHAR8>(LeftCharacter - ('a' - 'A'));
-    }
-    if ((RightCharacter >= 'a') && (RightCharacter <= 'z')) {
-      RightCharacter = static_cast<CHAR8>(RightCharacter - ('a' - 'A'));
-    }
-    if (LeftCharacter != RightCharacter) {
-      return FALSE;
-    }
-    ++Index;
-  }
-
-  return ((Index == LeftLength) && (Right[Index] == '\0')) ? TRUE : FALSE;
-}
-
-[[nodiscard]] OsIcon ParseIcon(
-    const CHAR8* Text,
-    const UINTN Length) noexcept {
-  if (EqualsIgnoreCase(Text, Length, "WINDOWS")) {
-    return OsIcon::Windows;
-  }
-  if (EqualsIgnoreCase(Text, Length, "KALI")) {
-    return OsIcon::Kali;
-  }
-  if (EqualsIgnoreCase(Text, Length, "BLACKARCH")) {
-    return OsIcon::BlackArch;
-  }
-  if (EqualsIgnoreCase(Text, Length, "LINUX")) {
-    return OsIcon::Linux;
-  }
-  return OsIcon::Generic;
-}
 
 [[nodiscard]] BOOLEAN CopyName(
     const CHAR8* Source,
@@ -148,7 +105,8 @@ namespace {
     return EFI_LOAD_ERROR;
   }
 
-  Entry->Icon = ParseIcon(Line + IconStart, Length - IconStart);
+  Entry->Icon = osidentity::ParseToken(
+      Line + IconStart, Length - IconStart);
   Entry->Available = FALSE;
   return EFI_SUCCESS;
 }

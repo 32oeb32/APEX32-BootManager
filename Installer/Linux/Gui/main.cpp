@@ -30,6 +30,7 @@ namespace {
 
 constexpr bool kHardwareInstallEnabled =
     APEX32_ENABLE_HARDWARE_INSTALL != 0;
+constexpr qsizetype kMaximumBootEntries = 32;
 
 struct Candidate final {
   QString Name;
@@ -69,6 +70,7 @@ struct Candidate final {
 
   if (Lower == QStringLiteral("efi\\boot\\bootx64.efi")) {
     Result.Name = QStringLiteral("UEFI FALLBACK (RECOVERY)");
+    Result.Icon = QStringLiteral("recovery");
     Result.DefaultSelected = false;
   } else if (Lower.contains(QStringLiteral("microsoft\\boot\\bootmgfw.efi"))) {
     Result.Name = QStringLiteral("WINDOWS BOOT MANAGER");
@@ -80,6 +82,34 @@ struct Candidate final {
              Lower.contains(QStringLiteral("\\blackarch\\"))) {
     Result.Name = QStringLiteral("BLACKARCH LINUX");
     Result.Icon = QStringLiteral("blackarch");
+  } else if (Lower.contains(QStringLiteral("\\ubuntu\\"))) {
+    Result.Name = QStringLiteral("UBUNTU");
+    Result.Icon = QStringLiteral("ubuntu");
+  } else if (Lower.contains(QStringLiteral("\\fedora\\"))) {
+    Result.Name = QStringLiteral("FEDORA");
+    Result.Icon = QStringLiteral("fedora");
+  } else if (Lower.contains(QStringLiteral("\\debian\\"))) {
+    Result.Name = QStringLiteral("DEBIAN");
+    Result.Icon = QStringLiteral("debian");
+  } else if (Lower.contains(QStringLiteral("\\linuxmint\\")) ||
+             Lower.contains(QStringLiteral("\\mint\\"))) {
+    Result.Name = QStringLiteral("LINUX MINT");
+    Result.Icon = QStringLiteral("mint");
+  } else if (Lower.contains(QStringLiteral("\\opensuse\\")) ||
+             Lower.contains(QStringLiteral("\\suse\\"))) {
+    Result.Name = QStringLiteral("OPENSUSE");
+    Result.Icon = QStringLiteral("opensuse");
+  } else if (Lower.contains(QStringLiteral("\\pop_os\\")) ||
+             Lower.contains(QStringLiteral("\\pop-os\\")) ||
+             Lower.contains(QStringLiteral("\\popos\\"))) {
+    Result.Name = QStringLiteral("POP!_OS");
+    Result.Icon = QStringLiteral("popos");
+  } else if (Lower.contains(QStringLiteral("\\opencore\\"))) {
+    Result.Name = QStringLiteral("OPENCORE");
+    Result.Icon = QStringLiteral("opencore");
+  } else if (Lower.contains(QStringLiteral("\\arch\\"))) {
+    Result.Name = QStringLiteral("ARCH LINUX");
+    Result.Icon = QStringLiteral("arch");
   } else {
     const QStringList Components = Relative.split('\\');
     QString Vendor = (Components.size() > 1) ? Components.at(1)
@@ -134,6 +164,9 @@ void SortCandidates(QList<Candidate>* Results) {
       [](const Candidate& Left, const Candidate& Right) {
         return Left.Name < Right.Name;
       });
+  if (Results->size() > kMaximumBootEntries) {
+    Results->resize(kMaximumBootEntries);
+  }
 }
 
 [[nodiscard]] QList<Candidate> ScanEsp(const QString& EspRoot) {
@@ -348,9 +381,9 @@ void SortCandidates(QList<Candidate>* Results) {
           QStringLiteral("kali")) &&
       HasCandidate(
           Candidates,
-          QStringLiteral("UBUNTU LINUX"),
+          QStringLiteral("UBUNTU"),
           QStringLiteral("\\EFI\\ubuntu\\shimx64.efi"),
-          QStringLiteral("linux")) &&
+          QStringLiteral("ubuntu")) &&
       HasCandidate(
           Candidates,
           QStringLiteral("WINDOWS BOOT MANAGER"),
@@ -365,7 +398,7 @@ void SortCandidates(QList<Candidate>* Results) {
           Candidates,
           QStringLiteral("UEFI FALLBACK (RECOVERY)"),
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
-          QStringLiteral("generic")) &&
+          QStringLiteral("recovery")) &&
       HasDefaultSelection(
           Candidates,
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
@@ -401,9 +434,14 @@ void SortCandidates(QList<Candidate>* Results) {
   if (!ProtocolError.isEmpty() || AuthorizedCandidates.size() != 5 ||
       !HasCandidate(
           AuthorizedCandidates,
-          QStringLiteral("UBUNTU LINUX"),
+          QStringLiteral("UBUNTU"),
           QStringLiteral("\\EFI\\ubuntu\\shimx64.efi"),
-          QStringLiteral("linux")) ||
+          QStringLiteral("ubuntu")) ||
+      !HasCandidate(
+          AuthorizedCandidates,
+          QStringLiteral("UEFI FALLBACK (RECOVERY)"),
+          QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),
+          QStringLiteral("recovery")) ||
       !HasDefaultSelection(
           AuthorizedCandidates,
           QStringLiteral("\\EFI\\BOOT\\BOOTX64.EFI"),

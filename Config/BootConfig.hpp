@@ -4,7 +4,7 @@
 
 namespace apex32 {
 
-inline constexpr UINTN kMaximumBootEntries = 8U;
+inline constexpr UINTN kMaximumBootEntries = 32U;
 inline constexpr UINTN kBootEntryNameCapacity = 40U;
 inline constexpr UINTN kBootEntryPathCapacity = 160U;
 
@@ -14,6 +14,17 @@ enum class OsIcon : UINT8 {
   Windows,
   Kali,
   BlackArch,
+  Ubuntu,
+  Fedora,
+  Arch,
+  Debian,
+  Mint,
+  OpenSuse,
+  PopOs,
+  OpenCore,
+  Recovery,
+  Usb,
+  Network,
 };
 
 struct BootEntry final {

@@ -21,10 +21,13 @@ personal APEX32 installation or development tree.
 `0.10.0-alpha1` is the published source milestone. The merged
 `0.11.0-beta1` foundation and current one-step installer candidate add:
 
-- the hardware-tested APEX32 intro and resolution-independent GOP renderer;
-- a generic configuration parser supporting up to eight UEFI loaders;
+- the hardware-tested APEX32 intro, original emblem, and reusable
+  resolution-independent GOP renderer;
+- a bounded configuration parser supporting up to 32 UEFI loaders;
 - paged, manual-only OS selection with no countdown or autoboot;
-- Kali, BlackArch, Windows, generic Linux, and generic EFI marks;
+- a pluggable identity registry for Kali, BlackArch, Windows, Ubuntu, Fedora,
+  Arch, Debian, Mint, openSUSE, Pop!_OS, OpenCore, recovery, USB, network,
+  generic Linux, and unknown EFI loaders;
 - same-ESP loader verification before a card can boot;
 - F2 read-only diagnostics;
 - a Linux Qt 6 installer prototype with **Systems → Scan Now**;
@@ -127,6 +130,8 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 ```
 
 See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).
+Renderer internals, supported GOP behavior, scaling, and clipping guarantees
+are documented in [Graphics foundation](Docs/GRAPHICS_FOUNDATION.md).
 
 ## Build the Debian beta package
 

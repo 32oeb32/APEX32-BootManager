@@ -24,13 +24,17 @@ g++ \
   -I. \
   Animation/IntroAnimation.cpp \
   Assets/OsLogos.cpp \
+  Assets/OsIdentity.cpp \
+  Assets/ApexEmblem.cpp \
   Boot/BootDiscovery.cpp \
   Boot/EfiLoader.cpp \
   BootManager/Main.cpp \
   Config/BootConfig.cpp \
   Fonts/Font5x7.cpp \
   Menu/WorkspaceMenu.cpp \
+  Menu/CardLayout.cpp \
   Renderer/GopRenderer.cpp \
+  Renderer/LogicalCanvas.cpp \
   Tests/HostSmoke.cpp \
   -o "${TEST_BINARY}"
 

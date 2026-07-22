@@ -21,6 +21,9 @@ struct EFI_GRAPHICS_OUTPUT_MODE_INFORMATION {
   UINTN Version;
   UINTN HorizontalResolution;
   UINTN VerticalResolution;
+  UINTN PixelFormat;
+  UINTN PixelInformation[4];
+  UINTN PixelsPerScanLine;
 };
 
 struct EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE {
@@ -50,4 +53,3 @@ struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
 };
 
 extern UINTN gEfiGraphicsOutputProtocolGuid;
-

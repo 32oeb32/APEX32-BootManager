@@ -120,6 +120,30 @@ QString FriendlyName(const QString &RelativePath) {
   if (Lower.contains(QStringLiteral("\\ubuntu\\"))) {
     return QStringLiteral("UBUNTU");
   }
+  if (Lower.contains(QStringLiteral("\\fedora\\"))) {
+    return QStringLiteral("FEDORA");
+  }
+  if (Lower.contains(QStringLiteral("\\debian\\"))) {
+    return QStringLiteral("DEBIAN");
+  }
+  if (Lower.contains(QStringLiteral("\\linuxmint\\")) ||
+      Lower.contains(QStringLiteral("\\mint\\"))) {
+    return QStringLiteral("LINUX MINT");
+  }
+  if (Lower.contains(QStringLiteral("\\opensuse\\")) ||
+      Lower.contains(QStringLiteral("\\suse\\"))) {
+    return QStringLiteral("OPENSUSE");
+  }
+  if (Lower.contains(QStringLiteral("\\pop_os\\")) ||
+      Lower.contains(QStringLiteral("\\pop-os\\"))) {
+    return QStringLiteral("POP!_OS");
+  }
+  if (Lower.contains(QStringLiteral("\\opencore\\"))) {
+    return QStringLiteral("OPENCORE");
+  }
+  if (Lower.contains(QStringLiteral("\\arch\\"))) {
+    return QStringLiteral("ARCH LINUX");
+  }
   if (Lower.endsWith(QStringLiteral("shimx64.efi")) ||
       Lower.endsWith(QStringLiteral("grubx64.efi"))) {
     return QStringLiteral("LINUX");

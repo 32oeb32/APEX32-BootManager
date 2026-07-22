@@ -15,7 +15,7 @@ constexpr CHAR16 kConfigurationPath[] = {
     'a', 'p', 'e', 'x', '3', '2', '.', 'c', 'f', 'g', 0,
 };
 
-constexpr UINTN kConfigurationBufferCapacity = 4096U;
+constexpr UINTN kConfigurationBufferCapacity = 16384U;
 
 [[nodiscard]] BOOLEAN FileExists(
     EFI_FILE_PROTOCOL* Root,
