@@ -17,7 +17,7 @@
   MdePkg/MdePkg.dec
 
 [LibraryClasses]
-  BaseIoLib
+  IoLib
   BaseLib
   BaseMemoryLib
   DevicePathLib

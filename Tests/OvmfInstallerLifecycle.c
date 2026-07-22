@@ -1,7 +1,7 @@
 #include <Uefi.h>
 
 #include <Guid/GlobalVariable.h>
-#include <Library/BaseIoLib.h>
+#include <Library/IoLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DevicePathLib.h>
