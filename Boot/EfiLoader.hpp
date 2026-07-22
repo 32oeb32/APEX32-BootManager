@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config/BootConfig.hpp"
 #include "UefiCompat.hpp"
 
 namespace apex32 {
@@ -19,6 +20,10 @@ struct EfiLaunchResult final {
 
 class EfiLoader final {
  public:
+  [[nodiscard]] static EfiLaunchResult Launch(
+      EFI_HANDLE ParentImageHandle,
+      const BootEntry& Entry) noexcept;
+
   [[nodiscard]] static EfiLaunchResult LaunchFromSameEsp(
       EFI_HANDLE ParentImageHandle,
       const CHAR16* LoaderPath) noexcept;

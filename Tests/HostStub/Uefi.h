@@ -29,7 +29,9 @@ struct EFI_GUID {
 #define FALSE static_cast<BOOLEAN>(0)
 #define MAX_UINTN UINTPTR_MAX
 #define EFI_SUCCESS static_cast<EFI_STATUS>(0)
+#define EFI_INVALID_PARAMETER (static_cast<EFI_STATUS>(1) << 63U | 2U)
 #define EFI_NOT_READY (static_cast<EFI_STATUS>(1) << 63U | 6U)
+#define EFI_BUFFER_TOO_SMALL (static_cast<EFI_STATUS>(1) << 63U | 5U)
 #define EFI_BAD_BUFFER_SIZE (static_cast<EFI_STATUS>(1) << 63U | 4U)
 #define EFI_UNSUPPORTED (static_cast<EFI_STATUS>(1) << 63U | 3U)
 #define EFI_LOAD_ERROR (static_cast<EFI_STATUS>(1) << 63U | 1U)

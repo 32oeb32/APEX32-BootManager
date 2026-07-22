@@ -19,6 +19,7 @@
   Assets/OsIdentity.cpp
   Assets/ApexEmblem.cpp
   Boot/BootDiscovery.cpp
+  Boot/FirmwareBootDiscovery.cpp
   Boot/EfiLoader.cpp
   BootManager/Main.cpp
   Config/BootConfig.cpp
@@ -38,8 +39,12 @@
   MemoryAllocationLib
   UefiApplicationEntryPoint
   UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid ## CONSUMES
   gEfiLoadedImageProtocolGuid    ## CONSUMES
   gEfiSimpleFileSystemProtocolGuid ## CONSUMES
+
+[Guids]
+  gEfiGlobalVariableGuid           ## CONSUMES

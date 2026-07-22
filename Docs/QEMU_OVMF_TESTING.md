@@ -31,6 +31,7 @@ Build the firmware with the pinned EDK II revision, then run:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-native-discovery.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ```
@@ -40,6 +41,7 @@ Expected result:
 ```text
 PASS: APEX32 reached a stable OVMF framebuffer (800x600, ...)
 PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry
+PASS: APEX32 discovered Boot7A33 and launched its native device path
 PASS: APEX32 completed a real UEFI handoff to the linux test payload (...)
 PASS: APEX32 completed a real UEFI handoff to the windows test payload (...)
 PASS: APEX32 launched real embedded-config GRUB and GRUB chainloaded the test payload
@@ -71,6 +73,16 @@ values, places it first in `BootOrder`, verifies the stored order, and cold
 reboots the guest. Because the fallback path still contains only the seeder,
 the APEX32 framebuffer can appear after that reboot only when OVMF launches the
 new NVRAM entry.
+
+The native-discovery pass seeds private APEX32, Linux, Windows, and unknown
+`Boot####` options in the disposable variable store. APEX32 must exclude its
+own option and the read-only `BootCurrent` option that launched it, retain the
+unknown option as a generic card, select `Boot7A33`, and
+launch the Linux signature payload using the complete device path stored in
+that firmware variable. Platform-internal firmware-volume applications such as
+OVMF setup and its internal shell are excluded because they are maintenance
+tools rather than operating-system targets. The host's NVRAM and ESP remain
+unreachable.
 
 The handoff pass boots APEX32 twice. QMP keyboard input selects the configured
 Kali card during the first run and the configured Windows card during the

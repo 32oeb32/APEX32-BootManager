@@ -5,7 +5,8 @@ with EDK II and the Graphics Output Protocol. It is an independent boot
 manager, not a GRUB or rEFInd theme.
 
 The Community Edition keeps the APEX32 Secure intro and cyber-interface while
-discovering its operating-system cards from a versioned configuration file.
+discovering operating-system cards from existing UEFI `Boot####` entries and
+the versioned installer configuration fallback.
 Cards intentionally show only the OS mark and OS name. Permanent project
 branding and recovery links are displayed beneath the cards:
 
@@ -24,6 +25,8 @@ personal APEX32 installation or development tree.
 - the hardware-tested APEX32 intro, original emblem, and reusable
   resolution-independent GOP renderer;
 - a bounded configuration parser supporting up to 32 UEFI loaders;
+- bounded, read-only `BootOrder`/`Boot####` discovery with native device-path
+  handoff across EFI System Partitions;
 - paged, manual-only OS selection with no countdown or autoboot;
 - a pluggable identity registry for Kali, BlackArch, Windows, Ubuntu, Fedora,
   Arch, Debian, Mint, openSUSE, Pop!_OS, OpenCore, recovery, USB, network,
@@ -52,10 +55,10 @@ personal APEX32 installation or development tree.
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
   management, and recovery fallback behavior.
 
-This is a beta candidate, not yet a universal production installer.
-The current firmware executes loaders located on its own EFI System Partition.
-Multi-ESP device resolution, signed release artifacts, distro packages, and
-the completed recovery GUI remain release gates.
+This is a beta candidate, not yet a universal production installer. Existing
+firmware entries can now launch across EFI System Partitions. Raw ESP scanning
+for loaders without a `Boot####` option, signed release artifacts, additional
+distro packages, and the completed recovery GUI remain release gates.
 
 Installer contributors can run a root-refusing mock-ESP test and a visibly
 disabled safe GUI demo without touching their boot configuration. See
@@ -125,6 +128,7 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-native-discovery.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ```
@@ -132,6 +136,8 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).
 Renderer internals, supported GOP behavior, scaling, and clipping guarantees
 are documented in [Graphics foundation](Docs/GRAPHICS_FOUNDATION.md).
+Native load-option parsing, ordering, bounds, and handoff are documented in
+[Native UEFI boot discovery](Docs/NATIVE_BOOT_DISCOVERY.md).
 
 ## Build the Debian beta package
 
