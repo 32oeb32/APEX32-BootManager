@@ -43,6 +43,10 @@ struct EFI_GUID {
 #define SCAN_DOWN 0x0002U
 #define SCAN_RIGHT 0x0003U
 #define SCAN_LEFT 0x0004U
+#define SCAN_HOME 0x0005U
+#define SCAN_END 0x0006U
+#define SCAN_PAGE_UP 0x0009U
+#define SCAN_PAGE_DOWN 0x000AU
 #define SCAN_F2 0x000CU
 #define SCAN_ESC 0x0017U
 

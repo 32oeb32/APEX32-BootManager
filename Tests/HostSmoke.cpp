@@ -17,7 +17,9 @@ extern "C" {
 #include "Boot/EfiLoader.hpp"
 #include "Boot/FirmwareBootDiscovery.hpp"
 #include "Assets/OsIdentity.hpp"
+#include "Menu/CardAnimation.hpp"
 #include "Menu/CardLayout.hpp"
+#include "Menu/CardNavigation.hpp"
 #include "Renderer/Color.hpp"
 #include "Renderer/GopRenderer.hpp"
 #include "Renderer/LogicalCanvas.hpp"
@@ -231,9 +233,9 @@ EFI_STATUS EFIAPI PresentFrame(
     PreviewPath = std::getenv("APEX32_BOOT_PREVIEW");
   } else if (State.FrameCount == 62) {
     PreviewPath = std::getenv("APEX32_ERROR_PREVIEW");
-  } else if (State.FrameCount == 64) {
+  } else if (State.FrameCount == 69) {
     PreviewPath = std::getenv("APEX32_BLACKARCH_BOOT_PREVIEW");
-  } else if (State.FrameCount == 65) {
+  } else if (State.FrameCount == 70) {
     PreviewPath = std::getenv("APEX32_BLACKARCH_ERROR_PREVIEW");
   }
   if ((PreviewPath != nullptr) && (PreviewPath[0] != '\0')) {
@@ -982,6 +984,71 @@ extern "C" VOID* SetMem(
   Passed &= Check(
       !apex32::CardLayout::Calculate(8U, 8U).Valid,
       "card layout must reject an out-of-range focused index");
+  Passed &= Check(
+      (apex32::CardNavigation::Apply(
+           0U,
+           10U,
+           apex32::CardNavigationAction::Previous) == 9U) &&
+          (apex32::CardNavigation::Apply(
+               9U,
+               10U,
+               apex32::CardNavigationAction::Next) == 0U) &&
+          (apex32::CardNavigation::Apply(
+               7U,
+               10U,
+               apex32::CardNavigationAction::First) == 0U) &&
+          (apex32::CardNavigation::Apply(
+               2U,
+               10U,
+               apex32::CardNavigationAction::Last) == 9U),
+      "single-card navigation must wrap and support first/last selection");
+  Passed &= Check(
+      (apex32::CardNavigation::Apply(
+           5U,
+           10U,
+           apex32::CardNavigationAction::PreviousPage) == 1U) &&
+          (apex32::CardNavigation::Apply(
+               5U,
+               10U,
+               apex32::CardNavigationAction::NextPage) == 9U) &&
+          (apex32::CardNavigation::Apply(
+               8U,
+               10U,
+               apex32::CardNavigationAction::NextPage) == 9U) &&
+          (apex32::CardNavigation::Apply(
+               MAX_UINTN,
+               10U,
+               apex32::CardNavigationAction::Next) == 0U),
+      "page navigation must preserve position, clamp, and reject bad focus");
+
+  UINT8 PreviousEase = 0U;
+  BOOLEAN EaseMonotonic = TRUE;
+  for (UINTN Step = 0U; Step <= apex32::kCardTransitionSteps; ++Step) {
+    const UINT8 CurrentEase = apex32::CardAnimation::Ease(
+        Step, apex32::kCardTransitionSteps);
+    if (CurrentEase < PreviousEase) {
+      EaseMonotonic = FALSE;
+    }
+    PreviousEase = CurrentEase;
+  }
+  Passed &= Check(
+      EaseMonotonic &&
+          (apex32::CardAnimation::Ease(
+               0U, apex32::kCardTransitionSteps) == 0U) &&
+          (apex32::CardAnimation::Ease(
+               apex32::kCardTransitionSteps,
+               apex32::kCardTransitionSteps) == 255U) &&
+          (apex32::CardAnimation::Ease(1U, 0U) == 255U),
+      "card focus easing must be monotonic with stable endpoints");
+  Passed &= Check(
+      (apex32::CardAnimation::Ease(MAX_UINTN - 1U, MAX_UINTN) == 255U) &&
+          (apex32::CardAnimation::FocusIntensity(
+               2U, 2U, 3U, 96U) == 159U) &&
+          (apex32::CardAnimation::FocusIntensity(
+               3U, 2U, 3U, 96U) == 96U) &&
+          (apex32::CardAnimation::FocusIntensity(
+               1U, 2U, 3U, 96U) == 0U),
+      "focus transitions must remain bounded and crossfade only two cards");
 
   apex32::BootEntry Fedora{};
   std::strcpy(Fedora.Name, "FEDORA LINUX");
@@ -1138,11 +1205,11 @@ int main() {
 
   Passed &= Check(Status == EFI_SUCCESS, "UefiMain must succeed");
   Passed &= Check(
-      State.FrameCount == 67,
-      "diagnostics, both handoffs, menu states, and exit must present 67 frames");
+      State.FrameCount == 77,
+      "diagnostics, animated focus, both handoffs, and exit must present 77 frames");
   Passed &= Check(
-      State.StallCount == 58,
-      "brand sequence and hold must execute 58 timed stalls");
+      State.StallCount == 68,
+      "brand and focus transitions must execute 68 timed stalls");
   Passed &= Check(
       State.FirstFrameColoredPixels == 0,
       "first frame must be black");

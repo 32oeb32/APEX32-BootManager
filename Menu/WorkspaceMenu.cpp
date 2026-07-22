@@ -8,7 +8,9 @@ extern "C" {
 #include "Boot/BootDiscovery.hpp"
 #include "Boot/EfiLoader.hpp"
 #include "Fonts/Font5x7.hpp"
+#include "Menu/CardAnimation.hpp"
 #include "Menu/CardLayout.hpp"
+#include "Menu/CardNavigation.hpp"
 #include "Renderer/GopRenderer.hpp"
 #include "Themes/DefaultTheme.hpp"
 
@@ -36,7 +38,7 @@ constexpr CHAR8 kNoSystems[] =
     "NO EFI BOOT ENTRIES FOUND // USE INSTALLER SCAN OR FIRMWARE SETUP";
 constexpr CHAR8 kConfigOffline[] = "CONFIGURATION NOT AVAILABLE";
 constexpr CHAR8 kHelp[] =
-    "ARROWS / TAB  MOVE     ENTER  BOOT     F2  STATUS     ESC  RETURN";
+    "ARROWS/TAB MOVE  PGUP/PGDN PAGE  ENTER BOOT  F2 STATUS  ESC RETURN";
 constexpr CHAR8 kEmptyHelp[] =
     "APEX32 INSTALLER  >  SYSTEMS  >  SCAN NOW";
 constexpr CHAR8 kVersion[] = "ABM CE 0.10.0-A1";
@@ -418,17 +420,40 @@ void DrawCard(
     const UINTN Width,
     const UINTN Height,
     const UINTN Unit,
-    const BOOLEAN Focused,
+    const UINT8 FocusIntensity,
     const BOOLEAN Compact) noexcept {
   const UINTN Thickness = AtLeastOne(Unit / 8U);
   const UINTN CenterX = X + (Width / 2U);
   const osidentity::Descriptor& Identity = osidentity::Resolve(Entry);
   const RgbColor Accent = Entry.Available ? Identity.Accent : theme::kRed;
   const RgbColor QuietAccent = ScaleColor(Accent, 120U);
+  const RgbColor ActiveAccent = BlendColor(
+      QuietAccent,
+      {Accent.Red, Accent.Green, Accent.Blue, FocusIntensity});
+  const RgbColor ActivePanel = BlendColor(
+      theme::kPanel,
+      {
+          theme::kPanelFocused.Red,
+          theme::kPanelFocused.Green,
+          theme::kPanelFocused.Blue,
+          FocusIntensity,
+      });
+  const RgbColor ActiveText = BlendColor(
+      theme::kSecondaryText,
+      {
+          theme::kPrimaryText.Red,
+          theme::kPrimaryText.Green,
+          theme::kPrimaryText.Blue,
+          FocusIntensity,
+      });
 
-  if (Focused && (X >= (3U * Thickness)) && (Y >= (3U * Thickness))) {
+  if ((FocusIntensity > 0U) && (X >= (3U * Thickness)) &&
+      (Y >= (3U * Thickness))) {
     for (UINTN Layer = 1U; Layer <= 3U; ++Layer) {
       const UINTN Offset = Layer * Thickness;
+      const UINT8 GlowIntensity = static_cast<UINT8>(
+          (150U * static_cast<UINTN>(FocusIntensity)) /
+          (Layer * 255U));
       DrawBorder(
           Renderer,
           X - Offset,
@@ -438,16 +463,11 @@ void DrawCard(
           Thickness,
           ScaleColor(
               Entry.Available ? Accent : theme::kRedGlow,
-              static_cast<UINT8>(150U / Layer)));
+              GlowIntensity));
     }
   }
 
-  Renderer.FillRectangle(
-      X,
-      Y,
-      Width,
-      Height,
-      Focused ? theme::kPanelFocused : theme::kPanel);
+  Renderer.FillRectangle(X, Y, Width, Height, ActivePanel);
   DrawBorder(Renderer, X, Y, Width, Height, Thickness, theme::kPanelLine);
   DrawBorder(
       Renderer,
@@ -465,15 +485,20 @@ void DrawCard(
       Height,
       6U * Unit,
       Thickness,
-      Focused ? Accent : QuietAccent);
+      ActiveAccent);
 
-  if (Focused) {
+  if (FocusIntensity > 0U) {
+    UINTN FocusBarWidth =
+        (2U * Unit * static_cast<UINTN>(FocusIntensity)) / 255U;
+    if (FocusBarWidth < Thickness) {
+      FocusBarWidth = Thickness;
+    }
     Renderer.FillRectangle(
-        CenterX - Unit,
+        CenterX - (FocusBarWidth / 2U),
         Y,
-        2U * Unit,
+        FocusBarWidth,
         2U * Thickness,
-        Accent);
+        ActiveAccent);
   }
 
   const UINTN IconUnit = Compact ? AtLeastOne(Unit / 2U) : Unit;
@@ -483,14 +508,14 @@ void DrawCard(
       CenterX,
       Y + ((Compact ? 2U : 4U) * Unit),
       IconUnit,
-      Focused ? Accent : QuietAccent);
+      ActiveAccent);
   DrawCenteredText(
       Renderer,
       Entry.Name,
       CenterX,
       Y + ((Compact ? 8U : 15U) * Unit),
       AtLeastOne(Unit / (Compact ? 5U : 4U)),
-      Focused ? theme::kPrimaryText : theme::kSecondaryText);
+      ActiveText);
 }
 
 [[nodiscard]] EFI_STATUS RenderBootLaunch(
@@ -687,17 +712,46 @@ EFI_STATUS WorkspaceMenu::Run(
       continue;
     }
 
+    const UINTN PreviousFocusedIndex = FocusedIndex;
     BOOLEAN StateChanged = FALSE;
     if ((Key.ScanCode == SCAN_LEFT) || (Key.ScanCode == SCAN_UP)) {
-      FocusedIndex = (FocusedIndex == 0U)
-                         ? (Configuration.Count - 1U)
-                         : (FocusedIndex - 1U);
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::Previous);
       StateChanged = TRUE;
     } else if ((Key.ScanCode == SCAN_RIGHT) ||
                (Key.ScanCode == SCAN_DOWN) ||
                (Key.UnicodeChar == static_cast<CHAR16>('\t'))) {
-      FocusedIndex = (FocusedIndex + 1U) % Configuration.Count;
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::Next);
       StateChanged = TRUE;
+    } else if (Key.ScanCode == SCAN_HOME) {
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::First);
+      StateChanged = (FocusedIndex != PreviousFocusedIndex) ? TRUE : FALSE;
+    } else if (Key.ScanCode == SCAN_END) {
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::Last);
+      StateChanged = (FocusedIndex != PreviousFocusedIndex) ? TRUE : FALSE;
+    } else if (Key.ScanCode == SCAN_PAGE_UP) {
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::PreviousPage);
+      StateChanged = (FocusedIndex != PreviousFocusedIndex) ? TRUE : FALSE;
+    } else if (Key.ScanCode == SCAN_PAGE_DOWN) {
+      FocusedIndex = CardNavigation::Apply(
+          FocusedIndex,
+          Configuration.Count,
+          CardNavigationAction::NextPage);
+      StateChanged = (FocusedIndex != PreviousFocusedIndex) ? TRUE : FALSE;
     } else if (Key.UnicodeChar == static_cast<CHAR16>('\r')) {
       const BootEntry& Entry = Configuration.Entries[FocusedIndex];
       if (!Entry.Available) {
@@ -733,7 +787,11 @@ EFI_STATUS WorkspaceMenu::Run(
     }
 
     if (StateChanged) {
-      Status = Render(Renderer, Configuration, FocusedIndex, nullptr, FALSE);
+      Status = AnimateFocus(
+          Renderer,
+          Configuration,
+          PreviousFocusedIndex,
+          FocusedIndex);
       if (EFI_ERROR(Status)) {
         return Status;
       }
@@ -745,6 +803,62 @@ EFI_STATUS WorkspaceMenu::Render(
     GopRenderer& Renderer,
     const BootConfiguration& Configuration,
     const UINTN FocusedIndex,
+    const CHAR8* Notice,
+    const BOOLEAN NoticeIsError) noexcept {
+  return RenderFrame(
+      Renderer,
+      Configuration,
+      FocusedIndex,
+      FocusedIndex,
+      255U,
+      Notice,
+      NoticeIsError);
+}
+
+EFI_STATUS WorkspaceMenu::AnimateFocus(
+    GopRenderer& Renderer,
+    const BootConfiguration& Configuration,
+    const UINTN PreviousFocusedIndex,
+    const UINTN FocusedIndex) noexcept {
+  if ((Configuration.Count == 0U) ||
+      (PreviousFocusedIndex >= Configuration.Count) ||
+      (FocusedIndex >= Configuration.Count)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  for (UINTN Step = 1U; Step <= kCardTransitionSteps; ++Step) {
+    const UINT8 Progress =
+        CardAnimation::Ease(Step, kCardTransitionSteps);
+    const EFI_STATUS PresentStatus = RenderFrame(
+        Renderer,
+        Configuration,
+        PreviousFocusedIndex,
+        FocusedIndex,
+        Progress,
+        nullptr,
+        FALSE);
+    if (EFI_ERROR(PresentStatus)) {
+      return PresentStatus;
+    }
+
+    if ((Step < kCardTransitionSteps) && (gBS != nullptr) &&
+        (gBS->Stall != nullptr)) {
+      const EFI_STATUS StallStatus =
+          gBS->Stall(kCardTransitionFrameMicroseconds);
+      if (EFI_ERROR(StallStatus)) {
+        return StallStatus;
+      }
+    }
+  }
+  return EFI_SUCCESS;
+}
+
+EFI_STATUS WorkspaceMenu::RenderFrame(
+    GopRenderer& Renderer,
+    const BootConfiguration& Configuration,
+    const UINTN PreviousFocusedIndex,
+    const UINTN FocusedIndex,
+    const UINT8 FocusProgress,
     const CHAR8* Notice,
     const BOOLEAN NoticeIsError) noexcept {
   const UINTN Unit = ResponsiveUnit(Renderer);
@@ -835,15 +949,20 @@ EFI_STATUS WorkspaceMenu::Render(
 
   for (UINTN LocalIndex = 0U; LocalIndex < VisibleCount; ++LocalIndex) {
     const CardRectangle& Card = Layout.Cards[LocalIndex];
+    const UINTN CardIndex = VisibleStart + LocalIndex;
     DrawCard(
         Renderer,
-        Configuration.Entries[VisibleStart + LocalIndex],
+        Configuration.Entries[CardIndex],
         Card.X,
         Card.Y,
         Card.Width,
         Card.Height,
         Unit,
-        (FocusedIndex == (VisibleStart + LocalIndex)) ? TRUE : FALSE,
+        CardAnimation::FocusIntensity(
+            CardIndex,
+            PreviousFocusedIndex,
+            FocusedIndex,
+            FocusProgress),
         Layout.Compact);
   }
 

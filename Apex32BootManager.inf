@@ -25,7 +25,9 @@
   Config/BootConfig.cpp
   Fonts/Font5x7.cpp
   Menu/WorkspaceMenu.cpp
+  Menu/CardAnimation.cpp
   Menu/CardLayout.cpp
+  Menu/CardNavigation.cpp
   Renderer/GopRenderer.cpp
   Renderer/LogicalCanvas.cpp
 
