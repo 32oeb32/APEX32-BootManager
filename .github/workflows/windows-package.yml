@@ -22,10 +22,11 @@ jobs:
             --outputdir "$env:RUNNER_TEMP/Qt"
           choco install nsis --yes --no-progress
 
-      - name: Build the graphical Windows preview
+      - name: Build the graphical Windows transaction candidate
         shell: pwsh
         run: |
           $qt = "$env:RUNNER_TEMP/Qt/6.8.3/msvc2022_64"
+          $env:PATH = "$qt/bin;$env:PATH"
           cmake `
             -S Installer/Windows `
             -B Installer/Windows/build `
@@ -37,6 +38,13 @@ jobs:
             --install Installer/Windows/build `
             --config Release `
             --prefix Installer/Windows/build/stage
+          ctest `
+            --test-dir Installer/Windows/build `
+            -C Release `
+            --output-on-failure
+          if (Test-Path "Installer/Windows/build/stage/bin/apex32-windows-transaction-test.exe") {
+            throw "The disposable transaction test must not be installed"
+          }
 
       - name: Verify fail-closed capabilities
         shell: pwsh
@@ -57,6 +65,7 @@ jobs:
           $expected = @(
             "APEX32CAPS|1",
             "SCAN|1",
+            "TRANSACTION|1",
             "INSTALL|0",
             "RESTORE|0",
             "UAC|1"
@@ -81,9 +90,9 @@ jobs:
             throw "Expected one Windows setup executable"
           }
 
-      - name: Publish the Windows preview artifact
+      - name: Publish the Windows transaction preview artifact
         uses: actions/upload-artifact@v6
         with:
-          name: APEX32-Community-Windows-Preview
+          name: APEX32-Community-Windows-Transaction-Preview
           path: Installer/Windows/build/package/APEX32-Community-Setup*.exe
           if-no-files-found: error

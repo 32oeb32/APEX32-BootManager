@@ -63,3 +63,19 @@ verified PE/COFF firmware and its extracted GUI must report `INSTALL|1`,
 from the root-owned packaged path and accepts configuration only from a private
 installer-generated temporary file owned by the authenticated desktop user.
 Every configuration entry is validated again before privileged mutation.
+
+## Windows transaction isolation
+
+The Windows GUI reports `TRANSACTION|1`, `INSTALL|0`, and `RESTORE|0`. Its
+schema 1 transaction engine is compiled independently from GUI presentation,
+but the only implemented firmware-store adapter is
+`FileFirmwareStore`. That adapter reads and writes one caller-supplied JSON
+file and is used exclusively by `apex32-windows-transaction-test`.
+
+The Windows lifecycle executable creates its ESP with `QTemporaryDir`, injects
+failure points, verifies rollback and restore, and checks a sentinel outside
+the temporary ESP. It is not installed by CMake or CPack. Windows CI runs it
+before packaging and explicitly rejects a staged test executable. No BCDEdit
+or firmware-variable API exists in this milestone, so the transaction
+foundation cannot mutate the runner's boot state. See
+[`WINDOWS_TRANSACTION_FOUNDATION.md`](WINDOWS_TRANSACTION_FOUNDATION.md).

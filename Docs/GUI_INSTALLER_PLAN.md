@@ -12,8 +12,11 @@ Cloning, compiling, and terminal commands are contributor workflows only.
   helper.
 - The CI-built Debian beta package is the only build mode that embeds verified
   firmware and enables `INSTALL|1` and `RESTORE|1`.
-- A one-launch Windows NSIS scan-preview package is built in CI. It reports
-  `INSTALL|0` and `RESTORE|0` until the native transaction is qualified.
+- A one-launch Windows NSIS scan/transaction-preview package is built in CI.
+  Its reusable transaction engine passes install, reinstall, failure rollback,
+  and restore tests against a temporary ESP and injected JSON firmware store.
+  It reports `INSTALL|0` and `RESTORE|0` until the native firmware backend and
+  verified firmware payload are qualified.
 
 ## Linux beta experience
 
@@ -42,7 +45,10 @@ will not be reused as a shortcut.
 
 The implemented preview already covers steps 1–4 with one setup executable,
 standard UAC elevation for read-only ESP discovery, automatic temporary ESP
-mounting, and automatic unmounting. Steps 5–6 remain fail-closed release gates.
+mounting, and automatic unmounting. The step 5/6 transaction contract is now
+tested on a disposable Windows runner, including rollback and restore, but its
+firmware store is deliberately simulated. Real hardware steps 5–6 remain
+fail-closed release gates.
 
 ## Release gates
 
@@ -50,6 +56,8 @@ mounting, and automatic unmounting. Steps 5–6 remain fail-closed release gates
   rollback.
 - Completed: persistent recovery state and full restore behavior in confined
   transaction tests.
+- Completed: the same persistent transaction contract on a disposable Windows
+  runner with an injected firmware store and package-exclusion assertion.
 - Completed: real OVMF fallback, NVRAM-first boot, Linux/Windows handoff,
   GRUB, and shim execution gates.
 - Completed: reproducible package layout and capability inspection without

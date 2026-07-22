@@ -39,7 +39,7 @@ personal APEX32 installation or development tree.
 - graphical authorization for read-only discovery on root-only ESP mounts;
 - a fail-closed, scan-only default build whose GUI and helper both omit the
   unfinished hardware-install path;
-- an isolated mock-ESP transaction test covering verified staging,
+- isolated Linux and Windows mock-ESP transaction tests covering verified staging,
   duplicate-free reinstall, immutable backup, automatic rollback, persistent
   recovery state, and full restore/uninstall semantics;
 - an OVMF visual gate that boots the real EFI application from a temporary
@@ -61,10 +61,13 @@ This is a beta candidate, not yet a universal production installer. Existing
 firmware entries can now launch across EFI System Partitions. Raw ESP scanning
 for loaders without a `Boot####` option, signed release artifacts, additional
 distro packages, and the completed recovery GUI remain release gates.
-The Windows package is still a scan-only preview: transactional Windows
-install/default/restore is not implemented or advertised as complete. See
+The Windows package now contains a reusable, rollback-tested transaction
+foundation and runs its complete simulated lifecycle on a disposable Windows
+runner. Its real firmware backend and verified EFI payload are still locked,
+so install/default/restore are not advertised as complete. See
 [boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
-[community roadmap](Docs/ROADMAP.md) for the precise milestone boundary.
+[Windows transaction foundation](Docs/WINDOWS_TRANSACTION_FOUNDATION.md) for
+the precise milestone boundary.
 
 Installer contributors can run a root-refusing mock-ESP test and a visibly
 disabled safe GUI demo without touching their boot configuration. See
@@ -101,14 +104,16 @@ PolicyKit authorization, installs it, and opens the GUI. It never builds EDK II
 or asks the user to copy EFI files or edit firmware variables.
 
 Windows users will download and double-click one
-`APEX32-Community-Setup.exe`. The current Windows package is a read-only scan
-preview and keeps boot installation disabled until native rollback and real
+`APEX32-Community-Setup.exe`. The current Windows package is a scan and
+transaction preview. It keeps boot installation disabled until the native
+firmware backend, verified EFI payload, disposable UEFI-VM lifecycle, and real
 hardware qualification pass. See
 [one-step installation](Docs/ONE_STEP_INSTALL.md).
 
-The Windows scan-preview package uses the normal UAC consent dialog. Its
-transactional install/default/restore backend is not enabled yet; Windows
-users will not be asked to clone the repository or use a terminal. See the
+The Windows preview uses the normal UAC consent dialog for read-only scanning.
+Its transaction and recovery contract is CI-tested, but the hardware firmware
+backend is not enabled yet; Windows users will not be asked to clone the
+repository or use a terminal. See the
 [GUI installer release plan](Docs/GUI_INSTALLER_PLAN.md).
 
 ## Build the firmware
