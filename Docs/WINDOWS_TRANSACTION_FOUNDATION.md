@@ -1,5 +1,10 @@
 # Windows transaction foundation
 
+> Historical milestone: this document describes the deliberately fail-closed
+> PR #7 foundation. PR #9 adds the packaged firmware, native variable store,
+> graphical install/restore controls, and OVMF lifecycle described in
+> [Windows graphical installation and recovery](WINDOWS_PRODUCTION_INSTALLER.md).
+
 PR #7 defines the rollback contract that the native Windows firmware backend
 must satisfy before `Install and Make Default` or `Restore` can be enabled.
 The transaction engine is shared by the Windows GUI build and a disposable

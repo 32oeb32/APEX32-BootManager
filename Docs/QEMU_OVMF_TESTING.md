@@ -34,6 +34,7 @@ Build the firmware with the pinned EDK II revision, then run:
 ./Tools/test-qemu-ovmf-native-discovery.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
+./Tools/test-qemu-ovmf-installer-lifecycle.sh
 ```
 
 Expected result:
@@ -46,6 +47,7 @@ PASS: APEX32 completed a real UEFI handoff to the linux test payload (...)
 PASS: APEX32 completed a real UEFI handoff to the windows test payload (...)
 PASS: APEX32 launched real embedded-config GRUB and GRUB chainloaded the test payload
 PASS: APEX32 launched real distribution shim and shim reached GRUB's test payload
+PASS: OVMF created and promoted an APEX32 entry, then restored exact BootOrder and removed it
 ```
 
 The test locates common Debian, Ubuntu, Fedora, and Arch OVMF paths. A custom
@@ -104,11 +106,16 @@ requires the complete APEX32 → shim → GRUB → test-payload chain to finish.
 real loader binaries come from the CI runner's operating-system packages; they
 are never committed to or redistributed by this repository.
 
-This proves the UEFI variable and default-entry mechanism in an isolated OVMF
-variable store, the general child-image handoff mechanism, and representative
-GRUB and shim execution with Secure Boot disabled. The Windows-path target is
-still synthetic because Microsoft binaries cannot be redistributed in this
-GPL repository. The gate also does not prove that the packaged hardware
-installer performs the same transaction on every vendor firmware or that
-Secure Boot accepts an unsigned development build. Those remain separate gates
-before the installer exposes **Make Default** in a public package.
+The installer-lifecycle pass boots a dedicated test-only UEFI application. It
+creates `Boot7A40` in the private OVMF variable store, places it first without
+dropping existing entries, reads the result back, restores the byte-identical
+original `BootOrder`, deletes `Boot7A40`, and reports success through QEMU's
+debug-exit device. This test has no path to the host ESP or firmware variables.
+
+Together these gates prove the UEFI variable/default-entry mechanism in an
+isolated OVMF store, exact lifecycle restoration, the general child-image
+handoff mechanism, and representative GRUB and shim execution with Secure Boot
+disabled. The Windows-path target remains synthetic because Microsoft binaries
+cannot be redistributed in this GPL repository. They do not prove behavior on
+every vendor firmware or permit the unsigned Community beta under Secure Boot;
+those remain final live-hardware and signing gates.

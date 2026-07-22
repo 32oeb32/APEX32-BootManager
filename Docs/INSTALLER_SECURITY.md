@@ -66,16 +66,29 @@ Every configuration entry is validated again before privileged mutation.
 
 ## Windows transaction isolation
 
-The Windows GUI reports `TRANSACTION|1`, `INSTALL|0`, and `RESTORE|0`. Its
-schema 1 transaction engine is compiled independently from GUI presentation,
-but the only implemented firmware-store adapter is
-`FileFirmwareStore`. That adapter reads and writes one caller-supplied JSON
-file and is used exclusively by `apex32-windows-transaction-test`.
+Ordinary Windows source builds report `TRANSACTION|1`, `INSTALL|0`, and
+`RESTORE|0`. The CI package opts in only after receiving the verified firmware
+from the pinned EDK II build; that package reports `INSTALL|1` and `RESTORE|1`.
+The packaged SHA-256 is compiled into the GUI and verified again before any
+transaction.
 
 The Windows lifecycle executable creates its ESP with `QTemporaryDir`, injects
 failure points, verifies rollback and restore, and checks a sentinel outside
-the temporary ESP. It is not installed by CMake or CPack. Windows CI runs it
-before packaging and explicitly rejects a staged test executable. No BCDEdit
-or firmware-variable API exists in this milestone, so the transaction
-foundation cannot mutate the runner's boot state. See
-[`WINDOWS_TRANSACTION_FOUNDATION.md`](WINDOWS_TRANSACTION_FOUNDATION.md).
+the temporary ESP. A second executable runs `NativeFirmwareStore` against
+in-memory variables and verifies new-entry creation, existing-entry reuse,
+promotion failure rollback, exact `BootOrder` restore, and Secure Boot state
+parsing. Neither executable is installed by CMake or CPack.
+
+Production uses `GetFirmwareEnvironmentVariableExW` and
+`SetFirmwareEnvironmentVariableExW` after enabling the narrowly scoped
+`SE_SYSTEM_ENVIRONMENT_NAME` privilege. It rejects duplicate active APEX32
+entries, malformed load options, missing ESP device paths, and unexpected
+changes to its reserved boot number. It never parses localized BCDEdit output.
+
+The OVMF job provides the real variable-writing gate: inside private firmware
+it creates and promotes an APEX32 entry, restores the exact original order,
+deletes the created entry, and exits only after read-back verification. The
+Windows runner never invokes the production variable adapter. Secure Boot
+causes installation to fail closed because the Community beta is unsigned;
+Restore remains available. See
+[`WINDOWS_PRODUCTION_INSTALLER.md`](WINDOWS_PRODUCTION_INSTALLER.md).

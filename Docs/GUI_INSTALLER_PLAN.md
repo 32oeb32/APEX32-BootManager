@@ -12,11 +12,9 @@ Cloning, compiling, and terminal commands are contributor workflows only.
   helper.
 - The CI-built Debian beta package is the only build mode that embeds verified
   firmware and enables `INSTALL|1` and `RESTORE|1`.
-- A one-launch Windows NSIS scan/transaction-preview package is built in CI.
-  Its reusable transaction engine passes install, reinstall, failure rollback,
-  and restore tests against a temporary ESP and injected JSON firmware store.
-  It reports `INSTALL|0` and `RESTORE|0` until the native firmware backend and
-  verified firmware payload are qualified.
+- A one-launch Windows NSIS package is built in CI with the verified EDK II
+  firmware. It provides scan, install, make-default, and restore through UAC.
+  Source-only builds remain default-off.
 
 ## Linux beta experience
 
@@ -43,12 +41,11 @@ Cloning, compiling, and terminal commands are contributor workflows only.
 Windows support requires a native backend; the Linux helper and PolicyKit code
 will not be reused as a shortcut.
 
-The implemented preview already covers steps 1–4 with one setup executable,
-standard UAC elevation for read-only ESP discovery, automatic temporary ESP
-mounting, and automatic unmounting. The step 5/6 transaction contract is now
-tested on a disposable Windows runner, including rollback and restore, but its
-firmware store is deliberately simulated. Real hardware steps 5–6 remain
-fail-closed release gates.
+The implemented package covers steps 1–6 with one setup executable, standard
+UAC elevation, automatic temporary ESP mounting, a native firmware-variable
+store, read-back verification, and graphical restore. CI uses fake variables
+on Windows and a real private-variable lifecycle under OVMF. Live-hardware
+steps 1–6 remain the final qualification gate before public stable release.
 
 ## Release gates
 
@@ -58,6 +55,9 @@ fail-closed release gates.
   transaction tests.
 - Completed: the same persistent transaction contract on a disposable Windows
   runner with an injected firmware store and package-exclusion assertion.
+- Completed: verified EFI packaging, native Windows `Boot####` transactions,
+  exact-order restore, fake-variable failure injection, and a private OVMF
+  install/promote/restore/remove lifecycle.
 - Completed: real OVMF fallback, NVRAM-first boot, Linux/Windows handoff,
   GRUB, and shim execution gates.
 - Completed: reproducible package layout and capability inspection without
@@ -73,9 +73,9 @@ fail-closed release gates.
 - Recovery media instructions and a verified independent fallback path.
 - CI assertion that release artifacts contain the intended capability mode.
 
-Until the remaining gates pass, source builds continue to report `INSTALL|0`.
-Only the tested package candidate may report `INSTALL|1`; it must not be
-published as a stable release yet.
+Source builds continue to report `INSTALL|0`. Only tested Linux and Windows
+package candidates may report `INSTALL|1`; neither is a stable release until
+the remaining live-hardware and signing gates pass.
 
 ### Implemented beta foundation
 

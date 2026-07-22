@@ -10,6 +10,8 @@ for required in \
   Gui/main.cpp \
   Transaction/WindowsTransaction.cpp \
   Transaction/WindowsTransaction.hpp \
+  Transaction/WindowsFirmwareStore.cpp \
+  Transaction/WindowsFirmwareStore.hpp \
   apex32-installer.manifest \
   apex32-installer.rc \
   README.md; do
@@ -33,16 +35,32 @@ grep -q 'mountvol.exe' "${windows_root}/Gui/main.cpp"
 grep -q 'TRANSACTION|1' "${windows_root}/Gui/main.cpp"
 grep -q 'INSTALL|0' "${windows_root}/Gui/main.cpp"
 grep -q 'RESTORE|0' "${windows_root}/Gui/main.cpp"
-grep -q 'Restore_->setEnabled(false)' "${windows_root}/Gui/main.cpp"
-! grep -q 'INSTALL|1' "${windows_root}/Gui/main.cpp"
+grep -q 'INSTALL|1' "${windows_root}/Gui/main.cpp"
+grep -q 'RESTORE|1' "${windows_root}/Gui/main.cpp"
+grep -q 'APEX32_ENABLE_HARDWARE_INSTALL' "${windows_root}/CMakeLists.txt"
+grep -q 'APEX32_FIRMWARE' "${windows_root}/CMakeLists.txt"
+grep -q -- '-DAPEX32_ENABLE_HARDWARE_INSTALL=ON' \
+  "${project_root}/.github/workflows/windows-package.yml"
 grep -q 'windows-transaction-lifecycle' "${windows_root}/CMakeLists.txt"
+grep -q 'windows-native-firmware-store' "${windows_root}/CMakeLists.txt"
 grep -q 'apex32-windows-transaction-test' \
   "${project_root}/.github/workflows/windows-package.yml"
 grep -q 'QTemporaryDir' "${project_root}/Tests/WindowsTransactionTest.cpp"
 grep -q 'FileFirmwareStore' \
   "${windows_root}/Transaction/WindowsTransaction.cpp"
-! grep -R -q -E 'bcdedit(\.exe)?|SetFirmwareEnvironmentVariable' \
-  "${windows_root}/Transaction"
+grep -q 'SetFirmwareEnvironmentVariableExW' \
+  "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
+grep -q 'ActiveOption' \
+  "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
+grep -q 'Order.Attributes != Snapshot.BootOrderAttributes' \
+  "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
+grep -q 'FakeVariables' \
+  "${project_root}/Tests/WindowsNativeFirmwareStoreTest.cpp"
+! grep -R -q -E 'bcdedit(\.exe)?' "${windows_root}"
+grep -q 'test-qemu-ovmf-installer-lifecycle.sh' \
+  "${project_root}/.github/workflows/ovmf-visual-smoke.yml"
+grep -q 'branches: \[main\]' \
+  "${project_root}/.github/workflows/windows-package.yml"
 capability_probe_line="$(grep -n 'std::ofstream File' \
   "${windows_root}/Gui/main.cpp" | cut -d: -f1)"
 gui_start_line="$(grep -n 'QApplication Application' \
@@ -53,4 +71,4 @@ gui_start_line="$(grep -n 'QApplication Application' \
   exit 1
 }
 
-echo "PASS: Windows package contains an isolated transaction lifecycle and remains fail-closed for hardware installation"
+echo "PASS: Windows package contains verified firmware, native-variable transactions, isolated lifecycle tests, and compile-time hardware gates"

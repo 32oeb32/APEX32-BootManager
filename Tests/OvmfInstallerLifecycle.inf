@@ -1,0 +1,33 @@
+## @file
+# Disposable OVMF gate for install, promotion, exact BootOrder restore, and cleanup.
+##
+
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = OvmfInstallerLifecycle
+  FILE_GUID      = 2A3E59A7-90D4-4F0D-BBEA-F0B4C29AA240
+  MODULE_TYPE    = UEFI_APPLICATION
+  VERSION_STRING = 0.11.0
+  ENTRY_POINT    = UefiMain
+
+[Sources]
+  OvmfInstallerLifecycle.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  BaseIoLib
+  BaseLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+
+[Guids]
+  gEfiGlobalVariableGuid
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid

@@ -43,20 +43,22 @@ The Windows user downloads and double-clicks one file:
 APEX32-Community-Setup.exe
 ```
 
-The current package foundation installs and launches the graphical scanner.
+The CI-built package installs and launches the complete graphical installer.
 **Scan Systems** requests standard UAC approval, temporarily mounts the EFI
 System Partition, discovers EFI loaders, unmounts it, and shows the results.
 No PowerShell, Command Prompt, drive-letter selection, or manual boot command
 is exposed to the user.
 
-The Windows preview contains a reusable transaction engine whose install,
-reinstall, immutable backup, rollback, restore, and confinement behavior is
-tested on a disposable Windows runner. Its firmware store is injected JSON,
-not the machine's real firmware. The preview intentionally keeps **Install and
-Make Default** and **Restore Previous Boot State** disabled. Those actions will
-only be enabled after the verified EFI payload, native firmware backend,
-disposable UEFI-VM, and real-hardware gates pass. The setup executable must
-never imply that a boot-changing capability is ready when it is not.
+The hardware-enabled package contains the verified EFI payload and enables
+**Install APEX32 and Make Default** plus **Restore Previous Boot State**. Its
+transaction engine preserves immutable backups and the exact original
+`BootOrder`. Windows-native variable logic is tested with fake variables, and
+OVMF independently exercises create, promote, restore, and remove against
+private firmware. Ordinary source builds remain `INSTALL|0`/`RESTORE|0`.
+
+The unsigned Community beta refuses installation while Secure Boot is
+enabled. A signed build and the live Windows hardware matrix remain final
+release gates.
 
 ## Shared graphical flow
 
@@ -69,7 +71,6 @@ Both packaged applications converge on the same visible workflow:
 5. Receive verified success or automatic rollback.
 6. Use **Recovery** to restore the previous boot manager.
 
-Linux currently implements the transactional install and recovery backend.
-Windows implements the one-launch package, read-only discovery, and a
-hardware-independent transaction/restore foundation; its real boot-changing
-backend remains a release gate.
+Linux and Windows now implement transactional install, make-default, and
+graphical recovery behind platform-native authorization. Final publication
+still requires the live-hardware matrix, signing, and release qualification.

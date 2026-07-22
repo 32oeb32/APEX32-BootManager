@@ -6,6 +6,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QEMU_BIN="${QEMU_BIN:-qemu-system-x86_64}"
 FIRMWARE="${APEX32_FIRMWARE:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/Apex32BootManager.efi}"
 SEEDER="${APEX32_OVMF_SEEDER:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfBootOrderSeeder.efi}"
+INSTALLER_LIFECYCLE="${APEX32_OVMF_INSTALLER_LIFECYCLE:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfInstallerLifecycle.efi}"
 LINUX_HANDOFF="${APEX32_OVMF_LINUX_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfLinuxHandoffTarget.efi}"
 WINDOWS_HANDOFF="${APEX32_OVMF_WINDOWS_HANDOFF:-${PROJECT_ROOT}/Build/DEBUG_GCC/X64/OvmfWindowsHandoffTarget.efi}"
 LINUX_LOADER_PATH="${APEX32_OVMF_LINUX_LOADER_PATH:-EFI/kali/grubx64.efi}"
@@ -68,6 +69,7 @@ fi
 LINUX_LOADER_SOURCE=/dev/null
 WINDOWS_LOADER_SOURCE=/dev/null
 HANDOFF_ARGUMENTS=()
+QEMU_DEBUG_EXIT_OPTIONS=()
 
 case "${TEST_MODE}" in
   fallback)
@@ -97,6 +99,16 @@ case "${TEST_MODE}" in
     QEMU_REBOOT_OPTIONS=()
     HANDOFF_ARGUMENTS=(--handoff-target linux)
     ;;
+  installer-lifecycle)
+    [[ -f "${INSTALLER_LIFECYCLE}" ]] || {
+      echo "error: OVMF installer lifecycle artifact is missing; rebuild first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${INSTALLER_LIFECYCLE}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-40}"
+    QEMU_REBOOT_OPTIONS=(-no-reboot)
+    QEMU_DEBUG_EXIT_OPTIONS=(-device isa-debug-exit,iobase=0xf4,iosize=0x04)
+    ;;
   handoff-linux)
     [[ -f "${LINUX_HANDOFF}" ]] || {
       echo "error: OVMF Linux handoff target not found at ${LINUX_HANDOFF}" >&2
@@ -122,7 +134,7 @@ case "${TEST_MODE}" in
     HANDOFF_ARGUMENTS=(--handoff-target windows)
     ;;
   *)
-    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, native-discovery, handoff-linux, or handoff-windows" >&2
+    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, native-discovery, installer-lifecycle, handoff-linux, or handoff-windows" >&2
     exit 2
     ;;
 esac
@@ -191,9 +203,35 @@ fi
   -serial "file:${SERIAL_LOG}" \
   -net none \
   "${QEMU_REBOOT_OPTIONS[@]}" \
+  "${QEMU_DEBUG_EXIT_OPTIONS[@]}" \
   -qmp "unix:${QMP_SOCKET},server=on,wait=off" \
   >/dev/null 2>&1 &
 QEMU_PID=$!
+
+if [[ "${TEST_MODE}" == "installer-lifecycle" ]]; then
+  for _ in $(seq 1 $((WAIT_SECONDS * 10))); do
+    if ! kill -0 "${QEMU_PID}" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+  if kill -0 "${QEMU_PID}" 2>/dev/null; then
+    echo "error: OVMF installer lifecycle did not finish" >&2
+    exit 1
+  fi
+  set +e
+  wait "${QEMU_PID}"
+  QEMU_STATUS=$?
+  set -e
+  QEMU_PID=""
+  if [[ "${QEMU_STATUS}" -ne 85 ]]; then
+    echo "error: OVMF installer lifecycle exited with ${QEMU_STATUS}" >&2
+    sed -n '1,120p' "${SERIAL_LOG}" >&2
+    exit 1
+  fi
+  echo "PASS: OVMF created and promoted an APEX32 entry, then restored exact BootOrder and removed it"
+  exit 0
+fi
 
 python3 "${PROJECT_ROOT}/Tests/QemuOvmfVisualTest.py" \
   --socket "${QMP_SOCKET}" \
