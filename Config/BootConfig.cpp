@@ -108,6 +108,9 @@ namespace {
   Entry->Icon = osidentity::ParseToken(
       Line + IconStart, Length - IconStart);
   Entry->Available = FALSE;
+  Entry->Source = BootEntrySource::Configuration;
+  Entry->FirmwareBootNumber = 0U;
+  Entry->DevicePathSize = 0U;
   return EFI_SUCCESS;
 }
 
@@ -174,7 +177,9 @@ EFI_STATUS BootConfig::ParseAscii(
   }
 
   Configuration->Loaded = TRUE;
+  Configuration->ConfigCount = Configuration->Count;
   Configuration->Status = EFI_SUCCESS;
+  Configuration->ConfigStatus = EFI_SUCCESS;
   return EFI_SUCCESS;
 }
 

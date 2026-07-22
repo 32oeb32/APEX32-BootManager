@@ -10,9 +10,20 @@
 - pluggable OS identity registry and generic unknown-loader fallback
 - resolution, overflow, and regional OVMF framebuffer validation
 
-PR #4 deliberately leaves installation behavior unchanged and does not access
-the host ESP. Native `Boot####`/multi-ESP enumeration remains a later discovery
-milestone rather than being mixed into the renderer.
+PR #4 deliberately left installation behavior unchanged and did not access
+the host ESP. Native discovery was kept out of the renderer and completed as
+the separate PR #5 milestone below.
+
+## PR #5 — native boot discovery
+
+- completed: bounded read-only `BootOrder` and `Boot####` enumeration;
+- completed: active load-option parsing with malformed-entry rejection;
+- completed: APEX32 self-entry filtering and firmware/config deduplication;
+- completed: native device-path `LoadImage()` / `StartImage()` handoff;
+- completed: generic cards for future and unknown EFI descriptions;
+- completed: isolated OVMF discovery and handoff through private variables;
+- next: raw ESP scanning for loaders that have no firmware entry; and
+- next: vendor hardware qualification for unusual short-form device paths.
 
 ## 0.10.0-alpha1 — dynamic public foundation
 

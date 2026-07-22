@@ -9,17 +9,33 @@
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Protocol/LoadedImage.h>
 
-#define APEX32_TEST_BOOT_NUMBER  0x7A32
+#define APEX32_TEST_BOOT_NUMBER   0x7A32
+#define APEX32_TEST_LINUX_NUMBER  0x7A33
+#define APEX32_TEST_WINDOWS_NUMBER  0x7A34
+#define APEX32_TEST_UNKNOWN_NUMBER  0x7A35
 
-STATIC CONST CHAR16  mBootVariableName[] = L"Boot7A32";
-STATIC CONST CHAR16  mDescription[]      = L"APEX32 OVMF DEFAULT TEST";
-STATIC CONST CHAR16  mApex32Path[]       =
+STATIC CONST CHAR16  mApex32VariableName[] = L"Boot7A32";
+STATIC CONST CHAR16  mLinuxVariableName[]  = L"Boot7A33";
+STATIC CONST CHAR16  mWindowsVariableName[] = L"Boot7A34";
+STATIC CONST CHAR16  mUnknownVariableName[] = L"Boot7A35";
+STATIC CONST CHAR16  mApex32Description[] = L"APEX32 OVMF DEFAULT TEST";
+STATIC CONST CHAR16  mLinuxDescription[]  = L"Kali Linux Native Entry";
+STATIC CONST CHAR16  mWindowsDescription[] = L"Windows Boot Manager";
+STATIC CONST CHAR16  mUnknownDescription[] = L"FutureOS Experimental Loader";
+STATIC CONST CHAR16  mApex32Path[] =
   L"\\EFI\\APEX32\\Apex32BootManager.efi";
+STATIC CONST CHAR16  mLinuxPath[] = L"\\EFI\\kali\\grubx64.efi";
+STATIC CONST CHAR16  mWindowsPath[] =
+  L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+STATIC CONST CHAR16  mUnknownPath[] = L"\\EFI\\vendor\\bootx64.efi";
 
 STATIC
 EFI_STATUS
-WriteApex32BootOption (
-  IN EFI_HANDLE  ImageHandle
+WriteBootOption (
+  IN EFI_HANDLE    ImageHandle,
+  IN CONST CHAR16  *VariableName,
+  IN CONST CHAR16  *Description,
+  IN CONST CHAR16  *LoaderPath
   )
 {
   EFI_STATUS                 Status;
@@ -43,7 +59,11 @@ WriteApex32BootOption (
     return Status;
   }
 
-  FilePath = FileDevicePath (LoadedImage->DeviceHandle, (CHAR16 *)mApex32Path);
+  if ((VariableName == NULL) || (Description == NULL) || (LoaderPath == NULL)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  FilePath = FileDevicePath (LoadedImage->DeviceHandle, (CHAR16 *)LoaderPath);
   if (FilePath == NULL) {
     return EFI_OUT_OF_RESOURCES;
   }
@@ -54,7 +74,7 @@ WriteApex32BootOption (
     return EFI_BAD_BUFFER_SIZE;
   }
 
-  DescriptionSize = sizeof (mDescription);
+  DescriptionSize = StrSize (Description);
   LoadOptionSize   = sizeof (UINT32) + sizeof (UINT16) +
                      DescriptionSize + FilePathSize;
   LoadOption = AllocateZeroPool (LoadOptionSize);
@@ -70,12 +90,12 @@ WriteApex32BootOption (
   Cursor += sizeof (Attributes);
   CopyMem (Cursor, &FilePathSize16, sizeof (FilePathSize16));
   Cursor += sizeof (FilePathSize16);
-  CopyMem (Cursor, mDescription, DescriptionSize);
+  CopyMem (Cursor, Description, DescriptionSize);
   Cursor += DescriptionSize;
   CopyMem (Cursor, FilePath, FilePathSize);
 
   Status = gRT->SetVariable (
-                  (CHAR16 *)mBootVariableName,
+                  (CHAR16 *)VariableName,
                   &gEfiGlobalVariableGuid,
                   EFI_VARIABLE_NON_VOLATILE |
                   EFI_VARIABLE_BOOTSERVICE_ACCESS |
@@ -104,6 +124,12 @@ PromoteApex32BootOption (
   UINTN       Index;
   UINTN       VerifySize;
   UINT16      *VerifyOrder;
+  STATIC CONST UINT16  DesiredOrder[] = {
+    APEX32_TEST_BOOT_NUMBER,
+    APEX32_TEST_LINUX_NUMBER,
+    APEX32_TEST_WINDOWS_NUMBER,
+    APEX32_TEST_UNKNOWN_NUMBER
+  };
 
   ExistingSize  = 0;
   ExistingOrder = NULL;
@@ -144,7 +170,7 @@ PromoteApex32BootOption (
   }
 
   ExistingCount = ExistingSize / sizeof (UINT16);
-  NewOrder = AllocateZeroPool (ExistingSize + sizeof (UINT16));
+  NewOrder = AllocateZeroPool (ExistingSize + sizeof (DesiredOrder));
   if (NewOrder == NULL) {
     if (ExistingOrder != NULL) {
       FreePool (ExistingOrder);
@@ -153,10 +179,13 @@ PromoteApex32BootOption (
     return EFI_OUT_OF_RESOURCES;
   }
 
-  NewOrder[0] = APEX32_TEST_BOOT_NUMBER;
-  NewCount    = 1;
+  CopyMem (NewOrder, DesiredOrder, sizeof (DesiredOrder));
+  NewCount = sizeof (DesiredOrder) / sizeof (DesiredOrder[0]);
   for (Index = 0; Index < ExistingCount; ++Index) {
-    if (ExistingOrder[Index] != APEX32_TEST_BOOT_NUMBER) {
+    if ((ExistingOrder[Index] != APEX32_TEST_BOOT_NUMBER) &&
+        (ExistingOrder[Index] != APEX32_TEST_LINUX_NUMBER) &&
+        (ExistingOrder[Index] != APEX32_TEST_WINDOWS_NUMBER) &&
+        (ExistingOrder[Index] != APEX32_TEST_UNKNOWN_NUMBER)) {
       NewOrder[NewCount++] = ExistingOrder[Index];
     }
   }
@@ -225,7 +254,42 @@ UefiMain (
 
   (VOID)SystemTable;
 
-  Status = WriteApex32BootOption (ImageHandle);
+  Status = WriteBootOption (
+             ImageHandle,
+             mApex32VariableName,
+             mApex32Description,
+             mApex32Path
+             );
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  Status = WriteBootOption (
+             ImageHandle,
+             mLinuxVariableName,
+             mLinuxDescription,
+             mLinuxPath
+             );
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  Status = WriteBootOption (
+             ImageHandle,
+             mWindowsVariableName,
+             mWindowsDescription,
+             mWindowsPath
+             );
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  Status = WriteBootOption (
+             ImageHandle,
+             mUnknownVariableName,
+             mUnknownDescription,
+             mUnknownPath
+             );
   if (EFI_ERROR (Status)) {
     return Status;
   }

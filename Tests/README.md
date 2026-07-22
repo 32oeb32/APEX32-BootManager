@@ -11,6 +11,7 @@ stubs with AddressSanitizer and UndefinedBehaviorSanitizer. It validates:
 
 - the complete intro and manual-only menu lifecycle;
 - schema 1 configuration loading from the canonical ESP path;
+- bounded `BootOrder`/`Boot####` parsing, ordering, filtering, and fallback;
 - exact configured loader probes;
 - dynamic card navigation and F2 diagnostics;
 - both simulated `LoadImage()` / `StartImage()` handoffs;
@@ -31,6 +32,7 @@ After building `Apex32BootManager.efi`, run:
 ```bash
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
+./Tools/test-qemu-ovmf-native-discovery.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ```
@@ -39,12 +41,14 @@ This boots the real EFI application under QEMU/OVMF and validates a captured
 GOP framebuffer. The second command creates a private APEX32 `Boot####` option,
 promotes it to the first `BootOrder` entry, cold reboots OVMF, and requires the
 gateway to render through that entry. The third command navigates the real
+native firmware-entry menu and launches `Boot7A33` through its stored device
+path. The fourth command navigates the real
 APEX32 menu and requires successful `LoadImage()` / `StartImage()` transfer to
 test-only Linux-path and Windows-path UEFI child applications. All commands use
 only a temporary virtual ESP and private OVMF variable store. See
 [QEMU/OVMF firmware testing](../Docs/QEMU_OVMF_TESTING.md).
 
-The fourth command adds real Linux loader coverage. It builds a self-contained
+The fifth command adds real Linux loader coverage. It builds a self-contained
 GRUB EFI image with an early embedded configuration from the locally installed
 distribution package, first launches GRUB directly through APEX32, then
 launches the packaged shim which in turn starts GRUB. Both paths must chainload

@@ -54,6 +54,11 @@ jobs:
           APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-bootorder.ppm
         run: ./Tools/test-qemu-ovmf-bootorder.sh
 
+      - name: Discover and launch a native Boot#### device path
+        env:
+          APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-native-discovery.ppm
+        run: ./Tools/test-qemu-ovmf-native-discovery.sh
+
       - name: Complete Linux and Windows-path UEFI handoffs
         env:
           APEX32_QEMU_SCREENSHOT: ${{ runner.temp }}/apex32-ovmf-handoff.ppm

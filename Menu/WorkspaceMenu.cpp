@@ -24,17 +24,16 @@ constexpr CHAR8 kRuntimeValue[] = "PROTECTED";
 constexpr CHAR8 kFirmwareLabel[] = "FIRMWARE MODE";
 constexpr CHAR8 kFirmwareValue[] = "UEFI X64";
 constexpr CHAR8 kTelemetryReady[] =
-    "GOP ACTIVE   CONFIGURATION VERIFIED   MANUAL CONTROL";
+    "GOP ACTIVE   BOOT ENTRIES DISCOVERED   MANUAL CONTROL";
 constexpr CHAR8 kTelemetryEmpty[] =
-    "GOP ACTIVE   INSTALLER CONFIGURATION REQUIRED";
+    "GOP ACTIVE   NO BOOTABLE EFI ENTRIES FOUND";
 constexpr CHAR8 kWebsite[] = "APEX32-SECURE.COM";
 constexpr CHAR8 kWebsiteLine[] =
     "OPEN SOURCE // DOCUMENTATION // RECOVERY";
 constexpr CHAR8 kSelectedReady[] = "READY // ENTER TO BOOT";
 constexpr CHAR8 kSelectedOffline[] = "LOADER OFFLINE // RESCAN IN INSTALLER";
 constexpr CHAR8 kNoSystems[] =
-    "NO SYSTEMS CONFIGURED // OPEN INSTALLER AND SELECT SCAN NOW";
-constexpr CHAR8 kConfigPath[] = "\\EFI\\APEX32\\APEX32.CFG";
+    "NO EFI BOOT ENTRIES FOUND // USE INSTALLER SCAN OR FIRMWARE SETUP";
 constexpr CHAR8 kConfigOffline[] = "CONFIGURATION NOT AVAILABLE";
 constexpr CHAR8 kHelp[] =
     "ARROWS / TAB  MOVE     ENTER  BOOT     F2  STATUS     ESC  RETURN";
@@ -47,7 +46,7 @@ constexpr CHAR8 kLaunchSubtitle[] = "DIRECT UEFI HANDOFF";
 constexpr CHAR8 kLaunchTelemetry[] =
     "LOADIMAGE  >  STARTIMAGE  >  OPERATING SYSTEM";
 constexpr CHAR8 kLaunchSafety[] =
-    "VERIFIED CONFIG PATH   //   SAFE RETURN ON EFI ERROR";
+    "READ-ONLY DISCOVERY   //   SAFE RETURN ON EFI ERROR";
 constexpr CHAR8 kDiagnosticsEyebrow[] = "APEX32 READ-ONLY CONTROL PLANE";
 constexpr CHAR8 kDiagnosticsTitle[] = "SYSTEM DIAGNOSTICS";
 constexpr CHAR8 kDiagnosticsSubtitle[] =
@@ -56,7 +55,9 @@ constexpr CHAR8 kManualPolicy[] = "MANUAL SELECTION ONLY";
 constexpr CHAR8 kDisabled[] = "DISABLED";
 constexpr CHAR8 kVerified[] = "VERIFIED";
 constexpr CHAR8 kOffline[] = "OFFLINE";
-constexpr CHAR8 kReadOnly[] = "READ ONLY";
+constexpr CHAR8 kFirmwareSource[] = "UEFI BOOT VARIABLE";
+constexpr CHAR8 kConfigSource[] = "APEX32 CONFIGURATION";
+constexpr CHAR8 kNativeDevicePath[] = "NATIVE UEFI DEVICE PATH";
 constexpr CHAR8 kNone[] = "NONE";
 constexpr CHAR8 kNotAvailable[] = "NOT AVAILABLE";
 constexpr CHAR8 kDiagnosticsHelp[] =
@@ -617,7 +618,7 @@ EFI_STATUS WorkspaceMenu::Run(
     GopRenderer& Renderer,
     EFI_SIMPLE_TEXT_INPUT_PROTOCOL* Input,
     const EFI_HANDLE ImageHandle) noexcept {
-  const BootConfiguration Configuration = BootDiscovery::LoadSameEsp(
+  const BootConfiguration Configuration = BootDiscovery::Discover(
       ImageHandle);
   UINTN FocusedIndex = 0U;
   for (UINTN Index = 0; Index < Configuration.Count; ++Index) {
@@ -716,8 +717,7 @@ EFI_STATUS WorkspaceMenu::Run(
       if (EFI_ERROR(Status)) {
         return Status;
       }
-      const EfiLaunchResult Result = EfiLoader::LaunchFromSameEsp(
-          ImageHandle, Entry.LoaderPath);
+      const EfiLaunchResult Result = EfiLoader::Launch(ImageHandle, Entry);
       CHAR8 Notice[112]{};
       FormatLaunchNotice(Result, Entry.Name, Notice, sizeof(Notice));
       Status = Render(
@@ -932,10 +932,14 @@ EFI_STATUS WorkspaceMenu::RenderDiagnostics(
   const UINTN LabelX = PanelX + (5U * Unit);
   const UINTN ValueX = PanelX + (27U * Unit);
   CHAR8 DisplayMode[48]{};
-  CHAR8 EntryCount[48]{};
+  CHAR8 FirmwareCount[48]{};
+  CHAR8 ConfigCount[48]{};
   CHAR8 SelectedPath[kBootEntryPathCapacity]{};
   FormatDisplayMode(Renderer, DisplayMode, sizeof(DisplayMode));
-  FormatEntryCount(Configuration.Count, EntryCount, sizeof(EntryCount));
+  FormatEntryCount(
+      Configuration.FirmwareCount, FirmwareCount, sizeof(FirmwareCount));
+  FormatEntryCount(
+      Configuration.ConfigCount, ConfigCount, sizeof(ConfigCount));
 
   const BOOLEAN HasSelection =
       (Configuration.Count > 0U) && (FocusedIndex < Configuration.Count);
@@ -991,25 +995,31 @@ EFI_STATUS WorkspaceMenu::RenderDiagnostics(
   constexpr const CHAR8* kLabels[] = {
       "BOOT CONTROL",
       "AUTOBOOT",
-      "CONFIG FILE",
+      "FIRMWARE ENTRIES",
       "CONFIG ENTRIES",
+      "SELECTED SOURCE",
       "SELECTED SYSTEM",
       "SELECTED PATH",
       "LOADER STATE",
-      "ESP ACCESS",
       "NVRAM WRITES",
   };
   const CHAR8* Values[] = {
       kManualPolicy,
       kDisabled,
-      Configuration.Loaded ? kConfigPath : kOffline,
-      EntryCount,
+      FirmwareCount,
+      ConfigCount,
+      (Selected != nullptr)
+          ? ((Selected->Source == BootEntrySource::Firmware)
+                 ? kFirmwareSource
+                 : kConfigSource)
+          : kNotAvailable,
       (Selected != nullptr) ? Selected->Name : kNotAvailable,
-      (Selected != nullptr) ? SelectedPath : kNotAvailable,
+      (Selected != nullptr)
+          ? ((SelectedPath[0] != '\0') ? SelectedPath : kNativeDevicePath)
+          : kNotAvailable,
       (Selected != nullptr)
           ? (Selected->Available ? kVerified : kOffline)
           : kNotAvailable,
-      kReadOnly,
       kNone,
   };
 
@@ -1018,8 +1028,7 @@ EFI_STATUS WorkspaceMenu::RenderDiagnostics(
     Renderer.DrawText(
         kLabels[Index], LabelX, RowY, SmallScale, theme::kSecondaryText);
     const BOOLEAN ErrorRow =
-        ((Index == 2U) && !Configuration.Loaded) ||
-        ((Index == 6U) && (Selected != nullptr) && !Selected->Available);
+        ((Index == 7U) && (Selected != nullptr) && !Selected->Available);
     Renderer.DrawText(
         Values[Index],
         ValueX,

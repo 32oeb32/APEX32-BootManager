@@ -85,6 +85,18 @@ case "${TEST_MODE}" in
     WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-75}"
     QEMU_REBOOT_OPTIONS=()
     ;;
+  native-discovery)
+    [[ -f "${SEEDER}" && -f "${LINUX_HANDOFF}" && -f "${WINDOWS_HANDOFF}" ]] || {
+      echo "error: native-discovery test artifacts are missing; rebuild first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${SEEDER}"
+    LINUX_LOADER_SOURCE="${LINUX_HANDOFF}"
+    WINDOWS_LOADER_SOURCE="${WINDOWS_HANDOFF}"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-90}"
+    QEMU_REBOOT_OPTIONS=()
+    HANDOFF_ARGUMENTS=(--handoff-target linux)
+    ;;
   handoff-linux)
     [[ -f "${LINUX_HANDOFF}" ]] || {
       echo "error: OVMF Linux handoff target not found at ${LINUX_HANDOFF}" >&2
@@ -110,7 +122,7 @@ case "${TEST_MODE}" in
     HANDOFF_ARGUMENTS=(--handoff-target windows)
     ;;
   *)
-    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, handoff-linux, or handoff-windows" >&2
+    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, native-discovery, handoff-linux, or handoff-windows" >&2
     exit 2
     ;;
 esac
@@ -191,6 +203,8 @@ python3 "${PROJECT_ROOT}/Tests/QemuOvmfVisualTest.py" \
 
 if [[ "${TEST_MODE}" == "bootorder" ]]; then
   echo "PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry"
+elif [[ "${TEST_MODE}" == "native-discovery" ]]; then
+  echo "PASS: APEX32 discovered Boot7A33 and launched its native device path"
 fi
 
 wait "${QEMU_PID}" 2>/dev/null || true

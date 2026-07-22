@@ -6,6 +6,7 @@ extern "C" {
 #include <Protocol/SimpleFileSystem.h>
 #include <Library/DevicePathLib.h>
 #include <Library/UefiBootServicesTableLib.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
 }
 
 #include <cstdio>
@@ -13,6 +14,8 @@ extern "C" {
 #include <cstring>
 
 #include "Boot/BootDiscovery.hpp"
+#include "Boot/EfiLoader.hpp"
+#include "Boot/FirmwareBootDiscovery.hpp"
 #include "Assets/OsIdentity.hpp"
 #include "Menu/CardLayout.hpp"
 #include "Renderer/Color.hpp"
@@ -27,7 +30,14 @@ extern "C" {
 UINTN gEfiGraphicsOutputProtocolGuid = 0;
 EFI_GUID gEfiLoadedImageProtocolGuid{};
 EFI_GUID gEfiSimpleFileSystemProtocolGuid{};
+EFI_GUID gEfiGlobalVariableGuid{
+    0x8BE4DF61U,
+    0x93CAU,
+    0x11D2U,
+    {0xAAU, 0x0DU, 0x00U, 0xE0U, 0x98U, 0x03U, 0x2BU, 0x8CU},
+};
 EFI_BOOT_SERVICES* gBS = nullptr;
+EFI_RUNTIME_SERVICES* gRT = nullptr;
 }
 
 namespace {
@@ -78,6 +88,16 @@ EFI_INPUT_KEY KeySequence[] = {
     {SCAN_ESC, 0},
 };
 UINTN NextKeyIndex = 0;
+
+UINT8 RuntimeBootOrder[] = {0x05U, 0x00U, 0x06U, 0x00U, 0x07U, 0x00U};
+alignas(8) UINT8 RuntimeOption5[1024]{};
+alignas(8) UINT8 RuntimeOption6[1024]{};
+alignas(8) UINT8 RuntimeOption7[1024]{};
+alignas(8) UINT8 RuntimeOption8[1024]{};
+UINTN RuntimeOption5Size = 0U;
+UINTN RuntimeOption6Size = 0U;
+UINTN RuntimeOption7Size = 0U;
+UINTN RuntimeOption8Size = 0U;
 
 EFI_HANDLE ParentImageHandle = reinterpret_cast<EFI_HANDLE>(0x1000);
 EFI_HANDLE EspDeviceHandle = reinterpret_cast<EFI_HANDLE>(0x2000);
@@ -300,6 +320,103 @@ EFI_STATUS EFIAPI HandleProtocol(
   return (Path[Index] == Expected[Index]) ? TRUE : FALSE;
 }
 
+EFI_STATUS EFIAPI RuntimeGetVariable(
+    CHAR16* VariableName,
+    EFI_GUID*,
+    UINT32* Attributes,
+    UINTN* DataSize,
+    VOID* Data) {
+  constexpr CHAR16 kBootOrder[] = {
+      'B', 'o', 'o', 't', 'O', 'r', 'd', 'e', 'r', 0,
+  };
+  constexpr CHAR16 kBoot0005[] = {
+      'B', 'o', 'o', 't', '0', '0', '0', '5', 0,
+  };
+  constexpr CHAR16 kBoot0006[] = {
+      'B', 'o', 'o', 't', '0', '0', '0', '6', 0,
+  };
+  constexpr CHAR16 kBoot0007[] = {
+      'B', 'o', 'o', 't', '0', '0', '0', '7', 0,
+  };
+  constexpr CHAR16 kBoot0008[] = {
+      'B', 'o', 'o', 't', '0', '0', '0', '8', 0,
+  };
+  if ((VariableName == nullptr) || (DataSize == nullptr)) {
+    return EFI_INVALID_PARAMETER;
+  }
+  const UINT8* Source = nullptr;
+  UINTN SourceSize = 0U;
+  if (MatchesPath(VariableName, kBootOrder)) {
+    Source = RuntimeBootOrder;
+    SourceSize = sizeof(RuntimeBootOrder);
+  } else if (MatchesPath(VariableName, kBoot0005)) {
+    Source = RuntimeOption5;
+    SourceSize = RuntimeOption5Size;
+  } else if (MatchesPath(VariableName, kBoot0006)) {
+    Source = RuntimeOption6;
+    SourceSize = RuntimeOption6Size;
+  } else if (MatchesPath(VariableName, kBoot0007)) {
+    Source = RuntimeOption7;
+    SourceSize = RuntimeOption7Size;
+  } else if (MatchesPath(VariableName, kBoot0008)) {
+    Source = RuntimeOption8;
+    SourceSize = RuntimeOption8Size;
+  } else {
+    return EFI_NOT_FOUND;
+  }
+  if ((*DataSize < SourceSize) || (Data == nullptr)) {
+    *DataSize = SourceSize;
+    return EFI_BUFFER_TOO_SMALL;
+  }
+  std::memcpy(Data, Source, SourceSize);
+  *DataSize = SourceSize;
+  if (Attributes != nullptr) {
+    *Attributes = 7U;
+  }
+  return EFI_SUCCESS;
+}
+
+EFI_STATUS EFIAPI RuntimeGetNextVariableName(
+    UINTN* VariableNameSize,
+    CHAR16* VariableName,
+    EFI_GUID* VendorGuid) {
+  constexpr CHAR16 kNames[][9] = {
+      {'B', 'o', 'o', 't', '0', '0', '0', '5', 0},
+      {'B', 'o', 'o', 't', '0', '0', '0', '6', 0},
+      {'B', 'o', 'o', 't', '0', '0', '0', '7', 0},
+      {'B', 'o', 'o', 't', '0', '0', '0', '8', 0},
+  };
+  if ((VariableNameSize == nullptr) || (VariableName == nullptr) ||
+      (VendorGuid == nullptr)) {
+    return EFI_INVALID_PARAMETER;
+  }
+  UINTN Next = 0U;
+  if (VariableName[0] != 0U) {
+    BOOLEAN Found = FALSE;
+    for (UINTN Index = 0U; Index < 4U; ++Index) {
+      if (MatchesPath(VariableName, kNames[Index])) {
+        Next = Index + 1U;
+        Found = TRUE;
+        break;
+      }
+    }
+    if (!Found || (Next >= 4U)) {
+      return EFI_NOT_FOUND;
+    }
+  }
+  constexpr UINTN kRequiredSize = 9U * sizeof(CHAR16);
+  if (*VariableNameSize < kRequiredSize) {
+    *VariableNameSize = kRequiredSize;
+    return EFI_BUFFER_TOO_SMALL;
+  }
+  for (UINTN Index = 0U; Index < 9U; ++Index) {
+    VariableName[Index] = kNames[Next][Index];
+  }
+  *VariableNameSize = kRequiredSize;
+  *VendorGuid = gEfiGlobalVariableGuid;
+  return EFI_SUCCESS;
+}
+
 EFI_STATUS EFIAPI OpenProbeFile(
     EFI_FILE_PROTOCOL*,
     EFI_FILE_PROTOCOL** NewHandle,
@@ -446,6 +563,227 @@ EFI_STATUS EFIAPI OutputString(
   }
 
   return Condition;
+}
+
+void WriteUint16(UINT8* Buffer, const UINTN Offset, const UINT16 Value) {
+  Buffer[Offset] = static_cast<UINT8>(Value & 0xFFU);
+  Buffer[Offset + 1U] = static_cast<UINT8>((Value >> 8U) & 0xFFU);
+}
+
+[[nodiscard]] UINTN BuildLoadOption(
+    UINT8* Buffer,
+    const UINTN Capacity,
+    const BOOLEAN Active,
+    const CHAR16* Description,
+    const CHAR16* LoaderPath) {
+  if ((Buffer == nullptr) || (Description == nullptr) || (Capacity < 16U)) {
+    return 0U;
+  }
+  std::memset(Buffer, 0, Capacity);
+  Buffer[0] = Active ? 1U : 0U;
+  UINTN Offset = 6U;
+  for (UINTN Index = 0U;; ++Index) {
+    if ((Offset + 2U) > Capacity) {
+      return 0U;
+    }
+    WriteUint16(Buffer, Offset, static_cast<UINT16>(Description[Index]));
+    Offset += 2U;
+    if (Description[Index] == 0U) {
+      break;
+    }
+  }
+
+  const UINTN DevicePathStart = Offset;
+  if (LoaderPath != nullptr) {
+    UINTN CharacterCount = 0U;
+    while (LoaderPath[CharacterCount] != 0U) {
+      ++CharacterCount;
+    }
+    ++CharacterCount;
+    const UINTN NodeLength = 4U + (CharacterCount * 2U);
+    if ((NodeLength > 0xFFFFU) ||
+        (Offset > (Capacity - NodeLength - 4U))) {
+      return 0U;
+    }
+    Buffer[Offset] = 0x04U;
+    Buffer[Offset + 1U] = 0x04U;
+    WriteUint16(Buffer, Offset + 2U, static_cast<UINT16>(NodeLength));
+    for (UINTN Index = 0U; Index < CharacterCount; ++Index) {
+      WriteUint16(
+          Buffer,
+          Offset + 4U + (Index * 2U),
+          static_cast<UINT16>(LoaderPath[Index]));
+    }
+    Offset += NodeLength;
+  } else {
+    if (Offset > (Capacity - 8U)) {
+      return 0U;
+    }
+    Buffer[Offset] = 0x01U;
+    Buffer[Offset + 1U] = 0x01U;
+    WriteUint16(Buffer, Offset + 2U, 4U);
+    Offset += 4U;
+  }
+  Buffer[Offset] = 0x7FU;
+  Buffer[Offset + 1U] = 0xFFU;
+  WriteUint16(Buffer, Offset + 2U, 4U);
+  Offset += 4U;
+  WriteUint16(
+      Buffer,
+      4U,
+      static_cast<UINT16>(Offset - DevicePathStart));
+  return Offset;
+}
+
+[[nodiscard]] bool RunFirmwareDiscoveryTests() {
+  bool Passed = true;
+  constexpr CHAR16 kWindowsName[] = {
+      'W', 'i', 'n', 'd', 'o', 'w', 's', ' ', 'B', 'o', 'o', 't',
+      ' ', 'M', 'a', 'n', 'a', 'g', 'e', 'r', 0,
+  };
+  constexpr CHAR16 kWindowsPath[] = {
+      '\\', 'E', 'F', 'I', '\\', 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f',
+      't', '\\', 'B', 'o', 'o', 't', '\\', 'b', 'o', 'o', 't', 'm', 'g',
+      'f', 'w', '.', 'e', 'f', 'i', 0,
+  };
+  alignas(8) UINT8 Buffer[1024]{};
+  const UINTN Size = BuildLoadOption(
+      Buffer, sizeof(Buffer), TRUE, kWindowsName, kWindowsPath);
+  apex32::BootEntry Entry{};
+  Passed &= Check(
+      Size > 0U &&
+          apex32::FirmwareBootDiscovery::ParseLoadOption(
+              0x0006U, Buffer, Size, &Entry) == EFI_SUCCESS,
+      "active Boot#### load options must parse");
+  Passed &= Check(
+      Entry.Source == apex32::BootEntrySource::Firmware &&
+          Entry.FirmwareBootNumber == 0x0006U && Entry.Available,
+      "firmware entry metadata must be retained");
+  Passed &= Check(
+      MatchesPath(Entry.LoaderPath, kWindowsPath) == TRUE,
+      "file-path nodes must be extracted for identity and diagnostics");
+  Passed &= Check(
+      apex32::osidentity::Resolve(Entry).Icon == apex32::OsIcon::Windows,
+      "firmware descriptions must drive the pluggable identity registry");
+
+  alignas(8) UINT8 Inactive[1024]{};
+  const UINTN InactiveSize = BuildLoadOption(
+      Inactive, sizeof(Inactive), FALSE, kWindowsName, kWindowsPath);
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0006U, Inactive, InactiveSize, &Entry) == EFI_NOT_READY,
+      "inactive firmware options must not become boot cards");
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0006U, Buffer, Size - 1U, &Entry) == EFI_BAD_BUFFER_SIZE,
+      "truncated load options must fail closed");
+
+  constexpr CHAR16 kEmptyName[] = {0};
+  alignas(8) UINT8 Generic[64]{};
+  const UINTN GenericSize = BuildLoadOption(
+      Generic, sizeof(Generic), TRUE, kEmptyName, nullptr);
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0007U, Generic, GenericSize, &Entry) == EFI_SUCCESS &&
+          std::strcmp(Entry.Name, "BOOT 0007") == 0 &&
+          Entry.LoaderPath[0] == 0U,
+      "unknown device paths must receive a generic bootable identity");
+
+  constexpr CHAR16 kApexName[] = {
+      'A', 'P', 'E', 'X', '3', '2', ' ', 'S', 'e', 'c', 'u', 'r', 'e',
+      ' ', 'G', 'a', 't', 'e', 'w', 'a', 'y', 0,
+  };
+  constexpr CHAR16 kApexPath[] = {
+      '\\', 'E', 'F', 'I', '\\', 'A', 'P', 'E', 'X', '3', '2', '\\',
+      'A', 'p', 'e', 'x', '3', '2', 'B', 'o', 'o', 't', 'M', 'a', 'n',
+      'a', 'g', 'e', 'r', '.', 'e', 'f', 'i', 0,
+  };
+  constexpr CHAR16 kInactiveName[] = {
+      'D', 'i', 's', 'a', 'b', 'l', 'e', 'd', ' ', 'T', 'o', 'o', 'l', 0,
+  };
+  constexpr CHAR16 kKaliNativeName[] = {
+      'K', 'a', 'l', 'i', ' ', 'L', 'i', 'n', 'u', 'x', 0,
+  };
+  constexpr CHAR16 kKaliNativePath[] = {
+      '\\', 'E', 'F', 'I', '\\', 'k', 'a', 'l', 'i', '\\', 'g', 'r',
+      'u', 'b', 'x', '6', '4', '.', 'e', 'f', 'i', 0,
+  };
+  RuntimeOption5Size = BuildLoadOption(
+      RuntimeOption5,
+      sizeof(RuntimeOption5),
+      TRUE,
+      kApexName,
+      kApexPath);
+  RuntimeOption6Size = BuildLoadOption(
+      RuntimeOption6,
+      sizeof(RuntimeOption6),
+      TRUE,
+      kWindowsName,
+      kWindowsPath);
+  RuntimeOption7Size = BuildLoadOption(
+      RuntimeOption7,
+      sizeof(RuntimeOption7),
+      FALSE,
+      kInactiveName,
+      nullptr);
+  RuntimeOption8Size = BuildLoadOption(
+      RuntimeOption8,
+      sizeof(RuntimeOption8),
+      TRUE,
+      kKaliNativeName,
+      kKaliNativePath);
+  EFI_RUNTIME_SERVICES RuntimeServices{
+      RuntimeGetVariable,
+      RuntimeGetNextVariableName,
+  };
+  gRT = &RuntimeServices;
+  apex32::BootConfiguration FirmwareConfiguration{};
+  const EFI_STATUS DiscoveryStatus =
+      apex32::FirmwareBootDiscovery::Discover(&FirmwareConfiguration);
+  gRT = nullptr;
+  Passed &= Check(
+      DiscoveryStatus == EFI_SUCCESS &&
+          FirmwareConfiguration.FirmwareCount == 2U &&
+          FirmwareConfiguration.Count == 2U,
+      "BootOrder and unlisted Boot#### variables must merge into one bounded set");
+  Passed &= Check(
+      std::strcmp(FirmwareConfiguration.Entries[0].Name,
+                  "Windows Boot Manager") == 0 &&
+          std::strcmp(FirmwareConfiguration.Entries[1].Name, "Kali Linux") == 0,
+      "firmware order must be preserved before extra active entries");
+  Passed &= Check(
+      FirmwareConfiguration.Entries[0].FirmwareBootNumber == 0x0006U &&
+          FirmwareConfiguration.Entries[1].FirmwareBootNumber == 0x0008U,
+      "APEX32 self entries and inactive options must be excluded");
+
+  gRT = &RuntimeServices;
+  const apex32::BootConfiguration MergedConfiguration =
+      apex32::BootDiscovery::Discover(ParentImageHandle);
+  gRT = nullptr;
+  Passed &= Check(
+      MergedConfiguration.Status == EFI_SUCCESS &&
+          MergedConfiguration.FirmwareCount == 2U &&
+          MergedConfiguration.ConfigCount == 1U &&
+          MergedConfiguration.Count == 3U,
+      "native entries and configuration fallback must merge without duplicates");
+  Passed &= Check(
+      std::strcmp(MergedConfiguration.Entries[2].Name,
+                  "BLACKARCH LINUX") == 0,
+      "non-duplicate configuration entries must remain available");
+
+  apex32::BootEntry NativeEntry{};
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0006U, Buffer, Size, &NativeEntry) == EFI_SUCCESS,
+      "native handoff fixture must parse before launch");
+  State.PendingTarget = 1U;
+  const apex32::EfiLaunchResult LaunchResult = apex32::EfiLoader::Launch(
+      ParentImageHandle, NativeEntry);
+  Passed &= Check(
+      LaunchResult.Stage == apex32::EfiLaunchStage::StartImage &&
+          State.LoadImageCount == 1U && State.StartImageCount == 1U,
+      "native Boot#### device paths must reach LoadImage and StartImage");
+  return Passed;
 }
 
 }  // namespace
@@ -732,7 +1070,8 @@ int main() {
   };
   gBS = &BootServices;
 
-  bool Passed = RunGraphicsFoundationTests();
+  bool Passed = RunFirmwareDiscoveryTests();
+  Passed &= RunGraphicsFoundationTests();
 
   EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL TextOutput{};
   TextOutput.OutputString = OutputString;

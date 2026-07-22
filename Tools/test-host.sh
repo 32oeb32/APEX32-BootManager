@@ -27,6 +27,7 @@ g++ \
   Assets/OsIdentity.cpp \
   Assets/ApexEmblem.cpp \
   Boot/BootDiscovery.cpp \
+  Boot/FirmwareBootDiscovery.cpp \
   Boot/EfiLoader.cpp \
   BootManager/Main.cpp \
   Config/BootConfig.cpp \
