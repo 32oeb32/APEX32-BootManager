@@ -38,6 +38,22 @@ PR #6 does not change Linux or Windows installer capabilities. In particular,
 the Windows package remains a read-only scan preview until its native
 transaction, rollback, and restore milestone is complete.
 
+## PR #7 — Windows transaction and disposable lifecycle foundation
+
+- reusable Windows file/configuration transaction independent from GUI code;
+- schema 1 recovery state with immutable pre-community backups and hashes;
+- injected firmware-store interface with duplicate-free APEX32 promotion;
+- automatic rollback across file and simulated firmware failures;
+- full restore for both replaced files and clean installs;
+- disposable Windows-runner lifecycle coverage confined to a temporary ESP;
+- NSIS assertion that the transaction test binary is never packaged; and
+- visible GUI transaction/restore status while hardware controls remain
+  disabled with `INSTALL|0` and `RESTORE|0`.
+
+PR #7 deliberately does not contain a BCDEdit or firmware-variable backend.
+The next Windows milestone packages the verified EFI image and implements the
+narrow real firmware store behind this already-tested transaction contract.
+
 ## 0.10.0-alpha1 — dynamic public foundation
 
 - GPL-3.0 repository foundation

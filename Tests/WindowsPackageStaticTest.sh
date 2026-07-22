@@ -8,6 +8,8 @@ windows_root="${project_root}/Installer/Windows"
 for required in \
   CMakeLists.txt \
   Gui/main.cpp \
+  Transaction/WindowsTransaction.cpp \
+  Transaction/WindowsTransaction.hpp \
   apex32-installer.manifest \
   apex32-installer.rc \
   README.md; do
@@ -28,9 +30,19 @@ grep -q 'requestedExecutionLevel level="asInvoker"' \
 grep -q 'ShellExecuteW' "${windows_root}/Gui/main.cpp"
 grep -q 'L"runas"' "${windows_root}/Gui/main.cpp"
 grep -q 'mountvol.exe' "${windows_root}/Gui/main.cpp"
+grep -q 'TRANSACTION|1' "${windows_root}/Gui/main.cpp"
 grep -q 'INSTALL|0' "${windows_root}/Gui/main.cpp"
 grep -q 'RESTORE|0' "${windows_root}/Gui/main.cpp"
+grep -q 'Restore_->setEnabled(false)' "${windows_root}/Gui/main.cpp"
 ! grep -q 'INSTALL|1' "${windows_root}/Gui/main.cpp"
+grep -q 'windows-transaction-lifecycle' "${windows_root}/CMakeLists.txt"
+grep -q 'apex32-windows-transaction-test' \
+  "${project_root}/.github/workflows/windows-package.yml"
+grep -q 'QTemporaryDir' "${project_root}/Tests/WindowsTransactionTest.cpp"
+grep -q 'FileFirmwareStore' \
+  "${windows_root}/Transaction/WindowsTransaction.cpp"
+! grep -R -q -E 'bcdedit(\.exe)?|SetFirmwareEnvironmentVariable' \
+  "${windows_root}/Transaction"
 capability_probe_line="$(grep -n 'std::ofstream File' \
   "${windows_root}/Gui/main.cpp" | cut -d: -f1)"
 gui_start_line="$(grep -n 'QApplication Application' \
@@ -41,4 +53,4 @@ gui_start_line="$(grep -n 'QApplication Application' \
   exit 1
 }
 
-echo "PASS: Windows package is one-launch, UAC-aware, read-only, and fail-closed for installation"
+echo "PASS: Windows package contains an isolated transaction lifecycle and remains fail-closed for hardware installation"

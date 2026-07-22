@@ -1,8 +1,9 @@
 # Windows one-launch installer foundation
 
 The Windows package is one APEX32 product, not a separate boot manager. It
-uses the shared branding and firmware while providing the native Windows
-authorization and packaging layer that Linux cannot supply.
+uses shared branding and will package the same verified firmware while
+providing the native Windows authorization and packaging layer that Linux
+cannot supply.
 
 The current Windows preview produces one `APEX32-Community-Setup.exe`. After
 installation, **Scan Systems** requests the standard UAC dialog, temporarily
@@ -10,11 +11,18 @@ mounts the EFI System Partition with the Windows-provided `mountvol` tool,
 discovers EFI applications, unmounts the partition, and displays the results.
 The user never selects a drive letter or types a boot command.
 
-`Install and Make Default` intentionally reports `INSTALL|0` and remains
-disabled. Microsoft documents that modifying BCD or firmware variables needs
-administrator privileges and that incorrect BCD changes can make a computer
-unbootable. It will only be enabled after the native transaction has backup,
-rollback, disposable-VM, and real-hardware validation equivalent to Linux.
+PR #7 adds a reusable schema 1 file/configuration transaction with immutable
+backup, failure injection, rollback, reinstall, and restore tests on a
+disposable Windows runner. The injected firmware store is a JSON file inside
+the test sandbox; it cannot modify BCD, UEFI variables, or the host ESP.
+
+`Install and Make Default` and `Restore Previous Boot State` intentionally
+report `INSTALL|0` / `RESTORE|0` and remain disabled. Microsoft documents that
+incorrect boot-configuration changes can make a computer unbootable. The
+controls will only be enabled after a native firmware backend, packaged
+verified EFI payload, disposable UEFI-VM lifecycle, and real-hardware
+validation satisfy the same rollback contract. See
+[Windows transaction foundation](../../Docs/WINDOWS_TRANSACTION_FOUNDATION.md).
 
 Authoritative Windows references:
 

@@ -11,6 +11,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets)
 
+add_library(
+  apex32-windows-transaction
+  STATIC
+  Transaction/WindowsTransaction.cpp
+  Transaction/WindowsTransaction.hpp)
+target_link_libraries(apex32-windows-transaction PUBLIC Qt6::Core)
+target_include_directories(
+  apex32-windows-transaction
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(
+  apex32-windows-transaction
+  PRIVATE NOMINMAX UNICODE _UNICODE WIN32_LEAN_AND_MEAN)
+
 add_executable(
   apex32-installer
   WIN32
@@ -28,13 +41,38 @@ target_link_libraries(
   PRIVATE
     Qt6::Core
     Qt6::Widgets
+    apex32-windows-transaction
     advapi32
     shell32)
 
+enable_testing()
+add_executable(
+  apex32-windows-transaction-test
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../Tests/WindowsTransactionTest.cpp")
+target_include_directories(
+  apex32-windows-transaction-test
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+target_link_libraries(
+  apex32-windows-transaction-test
+  PRIVATE apex32-windows-transaction Qt6::Core)
+add_test(
+  NAME windows-transaction-lifecycle
+  COMMAND $<TARGET_FILE:apex32-windows-transaction-test>)
+
 if(MSVC)
-  target_compile_options(apex32-installer PRIVATE /W4 /permissive-)
+  target_compile_options(
+    apex32-installer PRIVATE /W4 /permissive-)
+  target_compile_options(
+    apex32-windows-transaction PRIVATE /W4 /permissive-)
+  target_compile_options(
+    apex32-windows-transaction-test PRIVATE /W4 /permissive-)
 else()
-  target_compile_options(apex32-installer PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(
+    apex32-installer PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(
+    apex32-windows-transaction PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(
+    apex32-windows-transaction-test PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 get_target_property(qmake_executable Qt6::qmake IMPORTED_LOCATION)
@@ -74,7 +112,7 @@ set(CPACK_PACKAGE_VENDOR "APEX32 Secure")
 set(CPACK_PACKAGE_CONTACT "32oeb32@users.noreply.github.com")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://apex32-secure.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Graphical APEX32 UEFI discovery preview for Windows")
+    "Graphical APEX32 UEFI discovery and transaction preview for Windows")
 set(CPACK_PACKAGE_VERSION "0.11.0")
 set(CPACK_PACKAGE_FILE_NAME "APEX32-Community-Setup")
 set(CPACK_NSIS_DISPLAY_NAME "APEX32 Community Installer")

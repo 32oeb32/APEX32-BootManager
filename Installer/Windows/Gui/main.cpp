@@ -18,6 +18,8 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "Transaction/WindowsTransaction.hpp"
+
 #include <windows.h>
 #include <shellapi.h>
 
@@ -230,7 +232,10 @@ class InstallerWindow final : public QMainWindow {
     Brand->setObjectName(QStringLiteral("brand"));
     Brand->setAlignment(Qt::AlignCenter);
     Status_ = new QLabel(
-        QStringLiteral("Select Scan Systems. Windows will request UAC only when needed."),
+        QStringLiteral(
+            "Select Scan Systems. Transaction recovery schema %1 is CI-qualified; "
+            "hardware writes remain locked.")
+            .arg(Apex32::WindowsInstaller::TransactionSchemaVersion()),
         Central);
     Status_->setWordWrap(true);
     Scan_ = new QPushButton(QStringLiteral("Scan Systems"), Central);
@@ -242,9 +247,13 @@ class InstallerWindow final : public QMainWindow {
     Table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     Table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     Install_ = new QPushButton(
-        QStringLiteral("Install and Make Default — pending Windows hardware validation"),
+        QStringLiteral("Install and Make Default — hardware backend not yet qualified"),
         Central);
     Install_->setEnabled(false);
+    Restore_ = new QPushButton(
+        QStringLiteral("Restore Previous Boot State — hardware backend not yet qualified"),
+        Central);
+    Restore_->setEnabled(false);
 
     Layout->addWidget(Title);
     Layout->addWidget(Brand);
@@ -253,6 +262,7 @@ class InstallerWindow final : public QMainWindow {
     Layout->addWidget(Scan_);
     Layout->addWidget(Table_, 1);
     Layout->addWidget(Install_);
+    Layout->addWidget(Restore_);
     setCentralWidget(Central);
 
     setStyleSheet(QStringLiteral(
@@ -343,8 +353,11 @@ class InstallerWindow final : public QMainWindow {
       Table_->setItem(Row, 0, new QTableWidgetItem(Entry.Name));
       Table_->setItem(Row, 1, new QTableWidgetItem(Entry.Path));
     }
-    Status_->setText(QStringLiteral("%1 EFI loaders found. Installation remains disabled in this preview.")
-                         .arg(Loaders.size()));
+    Status_->setText(
+        QStringLiteral(
+            "%1 EFI loaders found. Transactional rollback and restore pass in "
+            "a disposable ESP; the real Windows firmware backend remains locked.")
+            .arg(Loaders.size()));
     Scan_->setEnabled(true);
   }
 
@@ -353,6 +366,7 @@ class InstallerWindow final : public QMainWindow {
   QPushButton *Scan_ = nullptr;
   QTableWidget *Table_ = nullptr;
   QPushButton *Install_ = nullptr;
+  QPushButton *Restore_ = nullptr;
 };
 
 }  // namespace
@@ -361,6 +375,7 @@ int main(int argc, char **argv) {
   constexpr std::string_view Capabilities =
       "APEX32CAPS|1\n"
       "SCAN|1\n"
+      "TRANSACTION|1\n"
       "INSTALL|0\n"
       "RESTORE|0\n"
       "UAC|1\n";

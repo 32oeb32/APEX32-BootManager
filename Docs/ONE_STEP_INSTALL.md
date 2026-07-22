@@ -49,10 +49,14 @@ System Partition, discovers EFI loaders, unmounts it, and shows the results.
 No PowerShell, Command Prompt, drive-letter selection, or manual boot command
 is exposed to the user.
 
-The Windows preview intentionally keeps **Install and Make Default** disabled.
-That action will only be enabled after its native backup, rollback, VM, and
-real-hardware gates pass. The setup executable must never imply that a
-boot-changing capability is ready when it is not.
+The Windows preview contains a reusable transaction engine whose install,
+reinstall, immutable backup, rollback, restore, and confinement behavior is
+tested on a disposable Windows runner. Its firmware store is injected JSON,
+not the machine's real firmware. The preview intentionally keeps **Install and
+Make Default** and **Restore Previous Boot State** disabled. Those actions will
+only be enabled after the verified EFI payload, native firmware backend,
+disposable UEFI-VM, and real-hardware gates pass. The setup executable must
+never imply that a boot-changing capability is ready when it is not.
 
 ## Shared graphical flow
 
@@ -66,5 +70,6 @@ Both packaged applications converge on the same visible workflow:
 6. Use **Recovery** to restore the previous boot manager.
 
 Linux currently implements the transactional install and recovery backend.
-Windows currently implements the one-launch package and read-only discovery
-foundation; its boot-changing backend remains a release gate.
+Windows implements the one-launch package, read-only discovery, and a
+hardware-independent transaction/restore foundation; its real boot-changing
+backend remains a release gate.

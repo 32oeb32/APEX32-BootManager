@@ -82,7 +82,7 @@ Run both suites without `sudo`:
 Expected final lines include:
 
 ```text
-PASS: 67 frames, 7 keys, dynamic config and manual boot paths clean
+PASS: 77 frames, 7 keys, dynamic config and manual boot paths clean
 PASS: UEFI entry lifecycle, verbose parsing, duplicate guard, and rollback
 PASS: fallback install, immutable backup, status, and restore
 PASS: regular-user discovery found 5 systems, preferred shim, excluded APEX32, kept fallback as unselected recovery, parsed authorized scan, and generated schema 1
@@ -216,10 +216,11 @@ pass.
 
 These commands are contributor tests, not the intended customer experience.
 The Linux beta will be launched from a desktop icon and will use only the
-desktop PolicyKit dialog. The planned Windows beta will be a signed MSI or EXE
-that uses the standard UAC consent dialog. Neither packaged flow will require a
-terminal. Current Windows users should not attempt to install this alpha from
-source; a Windows installer has not been released.
+desktop PolicyKit dialog. The Windows candidate is one NSIS setup executable
+that uses the standard UAC consent dialog. Neither packaged flow requires a
+terminal. The Windows candidate is not a hardware installer yet: its visible
+install and restore controls remain locked while the native firmware backend
+is being qualified.
 
 ## Debian package candidate
 
@@ -263,5 +264,9 @@ proves that a checksum mismatch stops before privilege elevation.
 
 `Tests/WindowsPackageStaticTest.sh` keeps the Windows preview fail-closed in
 Linux host CI. The separate `windows-package` workflow builds the Qt
-application and NSIS setup on Windows, runs its capability probe, and publishes
-one setup artifact. The preview must report `INSTALL|0` and `RESTORE|0`.
+application and NSIS setup on a disposable Windows runner, runs
+`windows-transaction-lifecycle`, runs the GUI capability probe, and publishes
+one setup artifact. The transaction test uses `QTemporaryDir` for its ESP and
+a JSON firmware store; it is excluded from the package. Expected capabilities
+are `TRANSACTION|1`, `INSTALL|0`, and `RESTORE|0`. See
+[Windows transaction foundation](WINDOWS_TRANSACTION_FOUNDATION.md).
