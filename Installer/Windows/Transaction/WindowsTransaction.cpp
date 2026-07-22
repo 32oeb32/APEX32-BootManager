@@ -50,14 +50,18 @@ bool ConfinedPath(
     const QString &Relative,
     QString *Result,
     QString *Error) {
-  const QString CleanRoot = QDir::cleanPath(QFileInfo(Root).absoluteFilePath());
+  const QString CleanRoot = QDir::fromNativeSeparators(
+      QDir::cleanPath(QFileInfo(Root).absoluteFilePath()));
   if (CleanRoot.isEmpty() || !QFileInfo(CleanRoot).isAbsolute() ||
       Relative.isEmpty() || QDir::isAbsolutePath(Relative)) {
     return SetError(Error, QStringLiteral("Invalid transaction path."));
   }
-  const QString Candidate =
-      QDir::cleanPath(QDir(CleanRoot).absoluteFilePath(Relative));
-  const QString Prefix = CleanRoot + QDir::separator();
+  const QString Candidate = QDir::fromNativeSeparators(
+      QDir::cleanPath(QDir(CleanRoot).absoluteFilePath(Relative)));
+  QString Prefix = CleanRoot;
+  if (!Prefix.endsWith(QLatin1Char('/'))) {
+    Prefix += QLatin1Char('/');
+  }
   if (!Candidate.startsWith(Prefix, Qt::CaseInsensitive)) {
     return SetError(
         Error,
