@@ -79,7 +79,10 @@ The native-discovery pass seeds private APEX32, Linux, Windows, and unknown
 own option and the read-only `BootCurrent` option that launched it, retain the
 unknown option as a generic card, select `Boot7A33`, and
 launch the Linux signature payload using the complete device path stored in
-that firmware variable. The host's NVRAM and ESP remain unreachable.
+that firmware variable. Platform-internal firmware-volume applications such as
+OVMF setup and its internal shell are excluded because they are maintenance
+tools rather than operating-system targets. The host's NVRAM and ESP remain
+unreachable.
 
 The handoff pass boots APEX32 twice. QMP keyboard input selects the configured
 Kali card during the first run and the configured Windows card during the

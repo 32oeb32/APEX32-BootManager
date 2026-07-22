@@ -12,6 +12,8 @@ namespace {
 constexpr UINT32 kLoadOptionActive = 0x00000001U;
 constexpr UINT8 kMediaDevicePath = 0x04U;
 constexpr UINT8 kFilePathDevicePath = 0x04U;
+constexpr UINT8 kFirmwareFileDevicePath = 0x06U;
+constexpr UINT8 kFirmwareVolumeDevicePath = 0x07U;
 constexpr UINT8 kEndDevicePath = 0x7FU;
 constexpr UINT8 kEndEntireDevicePath = 0xFFU;
 constexpr UINT8 kEndInstanceDevicePath = 0x01U;
@@ -229,6 +231,16 @@ void FormatFallbackName(
     const UINTN NodeLength = ReadUint16(Buffer + Offset + 2U);
     if ((NodeLength < kNodeHeaderSize) || (NodeLength > (BufferSize - Offset))) {
       return EFI_LOAD_ERROR;
+    }
+
+    // Firmware-volume applications such as a platform setup UI or internal
+    // shell are maintenance tools, not operating-system boot targets. Keeping
+    // them out of the card model also prevents Enter from leaving APEX32 for a
+    // firmware configuration screen when an OS loader was expected.
+    if ((Type == kMediaDevicePath) &&
+        ((SubType == kFirmwareFileDevicePath) ||
+         (SubType == kFirmwareVolumeDevicePath))) {
+      return EFI_NOT_READY;
     }
 
     if ((Type == kMediaDevicePath) && (SubType == kFilePathDevicePath) &&

@@ -698,6 +698,30 @@ void WriteUint16(UINT8* Buffer, const UINTN Offset, const UINT16 Value) {
           Entry.LoaderPath[0] == 0U,
       "unknown device paths must receive a generic bootable identity");
 
+  constexpr CHAR16 kFirmwareUiName[] = {
+      'U', 'E', 'F', 'I', ' ', 'F', 'i', 'r', 'm', 'w', 'a', 'r', 'e',
+      ' ', 'S', 'e', 't', 'u', 'p', 0,
+  };
+  alignas(8) UINT8 FirmwareUi[128]{};
+  const UINTN FirmwareUiSize = BuildLoadOption(
+      FirmwareUi,
+      sizeof(FirmwareUi),
+      TRUE,
+      kFirmwareUiName,
+      nullptr);
+  const UINTN FirmwareUiPathStart = 6U + sizeof(kFirmwareUiName);
+  FirmwareUi[FirmwareUiPathStart] = 0x04U;
+  FirmwareUi[FirmwareUiPathStart + 1U] = 0x06U;
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0009U, FirmwareUi, FirmwareUiSize, &Entry) == EFI_NOT_READY,
+      "firmware-volume maintenance applications must not become OS cards");
+  FirmwareUi[FirmwareUiPathStart + 1U] = 0x07U;
+  Passed &= Check(
+      apex32::FirmwareBootDiscovery::ParseLoadOption(
+          0x0009U, FirmwareUi, FirmwareUiSize, &Entry) == EFI_NOT_READY,
+      "firmware-volume container options must not become OS cards");
+
   constexpr CHAR16 kApexName[] = {
       'A', 'P', 'E', 'X', '3', '2', ' ', 'S', 'e', 'c', 'u', 'r', 'e',
       ' ', 'G', 'a', 't', 'e', 'w', 'a', 'y', 0,
