@@ -86,7 +86,10 @@ unreachable.
 
 The handoff pass boots APEX32 twice. QMP keyboard input selects the configured
 Kali card during the first run and the configured Windows card during the
-second, then sends Enter. Each configured path contains a test-only UEFI child
+second, then sends Enter. Before the Windows handoff, the analyzer captures
+both Right-key focus transitions, requires each transition to visibly change
+the framebuffer, and requires the resulting frame to retain the APEX32 gateway
+palette. Each configured path contains a test-only UEFI child
 application with a unique framebuffer signature. Requiring that signature
 proves that the real firmware handled input, resolved the loader on the same
 virtual ESP, and successfully called UEFI `LoadImage()` and `StartImage()`.

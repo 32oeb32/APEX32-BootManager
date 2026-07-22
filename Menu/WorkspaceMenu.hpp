@@ -22,6 +22,21 @@ class WorkspaceMenu final {
       const CHAR8* Notice,
       BOOLEAN NoticeIsError) noexcept;
 
+  [[nodiscard]] static EFI_STATUS RenderFrame(
+      GopRenderer& Renderer,
+      const BootConfiguration& Configuration,
+      UINTN PreviousFocusedIndex,
+      UINTN FocusedIndex,
+      UINT8 FocusProgress,
+      const CHAR8* Notice,
+      BOOLEAN NoticeIsError) noexcept;
+
+  [[nodiscard]] static EFI_STATUS AnimateFocus(
+      GopRenderer& Renderer,
+      const BootConfiguration& Configuration,
+      UINTN PreviousFocusedIndex,
+      UINTN FocusedIndex) noexcept;
+
   [[nodiscard]] static EFI_STATUS RenderDiagnostics(
       GopRenderer& Renderer,
       const BootConfiguration& Configuration,

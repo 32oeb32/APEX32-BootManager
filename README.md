@@ -28,6 +28,8 @@ personal APEX32 installation or development tree.
 - bounded, read-only `BootOrder`/`Boot####` discovery with native device-path
   handoff across EFI System Partitions;
 - paged, manual-only OS selection with no countdown or autoboot;
+- bounded animated focus cross-fades plus Arrow, Tab, Home, End, and page
+  navigation;
 - a pluggable identity registry for Kali, BlackArch, Windows, Ubuntu, Fedora,
   Arch, Debian, Mint, openSUSE, Pop!_OS, OpenCore, recovery, USB, network,
   generic Linux, and unknown EFI loaders;
@@ -59,6 +61,10 @@ This is a beta candidate, not yet a universal production installer. Existing
 firmware entries can now launch across EFI System Partitions. Raw ESP scanning
 for loaders without a `Boot####` option, signed release artifacts, additional
 distro packages, and the completed recovery GUI remain release gates.
+The Windows package is still a scan-only preview: transactional Windows
+install/default/restore is not implemented or advertised as complete. See
+[boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
+[community roadmap](Docs/ROADMAP.md) for the precise milestone boundary.
 
 Installer contributors can run a root-refusing mock-ESP test and a visibly
 disabled safe GUI demo without touching their boot configuration. See

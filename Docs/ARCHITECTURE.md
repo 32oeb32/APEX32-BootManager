@@ -13,7 +13,8 @@ network stack and performs no NVRAM writes. Its responsibilities are limited to:
 4. render name-only OS cards and read explicit keyboard input; and
 5. hand the selected loader to UEFI `LoadImage` and `StartImage`.
 
-There is no timer path, countdown, or automatic selection.
+There is no countdown, timer-driven selection, or automatic boot. Finite
+focus-transition frames are presented only after explicit navigation input.
 
 ### Graphics pipeline
 
@@ -21,8 +22,11 @@ There is no timer path, countdown, or automatic selection.
 primitives. `LogicalCanvas` maps a 1920×1080 scene into a centered,
 aspect-preserving physical viewport. `Assets/OsIdentity` owns the extensible OS
 token/accent/mark registry, while `Menu/CardLayout` creates bounded dynamic
-one-to-four-card pages. Renderer code contains no menu policy or loader logic.
-See [Graphics foundation](GRAPHICS_FOUNDATION.md).
+one-to-four-card pages. `Menu/CardNavigation` owns bounded index movement, and
+`Menu/CardAnimation` owns bounded integer easing for explicit focus changes.
+Renderer code contains no menu policy or loader logic.
+See [Graphics foundation](GRAPHICS_FOUNDATION.md) and
+[Boot-card interactions](BOOT_CARD_INTERACTIONS.md).
 
 ## Graphical installer
 

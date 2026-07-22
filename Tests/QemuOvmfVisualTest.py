@@ -131,6 +131,16 @@ def handoff_signature_ratio(pixels: bytes, target: str) -> float:
     return matching / (len(pixels) // 3)
 
 
+def frame_difference_ratio(before: bytes, after: bytes) -> float:
+    if len(before) != len(after) or not before:
+        raise ValueError("frame comparison requires equal non-empty buffers")
+    changed = 0
+    for offset in range(0, len(before), 3):
+        if before[offset : offset + 3] != after[offset : offset + 3]:
+            changed += 1
+    return changed / (len(before) // 3)
+
+
 class QmpClient:
     def __init__(self, socket_path: Path) -> None:
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -213,6 +223,12 @@ def run_self_test() -> int:
     if handoff_signature_ratio(bytes((0x00, 0x78, 0xD4)) * 100, "windows") != 1.0:
         print("FAIL: Windows handoff signature self-test did not match", file=sys.stderr)
         return 1
+    baseline = bytes((0x10, 0x10, 0x10)) * 100
+    changed = bytearray(baseline)
+    changed[0:30] = bytes((0x21, 0xD4, 0xEA)) * 10
+    if abs(frame_difference_ratio(baseline, bytes(changed)) - 0.10) > 1e-9:
+        print("FAIL: focus-frame difference self-test did not match", file=sys.stderr)
+        return 1
     print("PASS: QEMU framebuffer analyzer self-test")
     return 0
 
@@ -292,10 +308,41 @@ def main() -> int:
                             return 0
 
                         if args.handoff_target == "windows":
-                            client.send_key("right")
-                            time.sleep(0.35)
-                            client.send_key("right")
-                            time.sleep(0.35)
+                            previous_pixels = pixels
+                            for transition in range(2):
+                                client.send_key("right")
+                                time.sleep(0.35)
+                                client.execute(
+                                    "screendump", {"filename": str(args.screenshot)}
+                                )
+                                moved_width, moved_height, moved_pixels = parse_ppm(
+                                    args.screenshot
+                                )
+                                moved_metrics = analyze_screen(
+                                    moved_width, moved_height, moved_pixels
+                                )
+                                difference = frame_difference_ratio(
+                                    previous_pixels, moved_pixels
+                                )
+                                if not looks_like_apex32(moved_metrics):
+                                    print(
+                                        "FAIL: focus transition left the APEX32 "
+                                        "gateway frame",
+                                        file=sys.stderr,
+                                    )
+                                    return 1
+                                if difference < 0.0005:
+                                    print(
+                                        "FAIL: focus transition did not visibly "
+                                        "update the frame",
+                                        file=sys.stderr,
+                                    )
+                                    return 1
+                                print(
+                                    "INFO: validated animated focus transition "
+                                    f"{transition + 1} (changed={difference:.2%})"
+                                )
+                                previous_pixels = moved_pixels
                         client.send_key("ret")
                         handoff_started = True
                         first_handoff_frame = None

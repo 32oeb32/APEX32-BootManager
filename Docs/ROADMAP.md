@@ -25,6 +25,19 @@ the separate PR #5 milestone below.
 - next: raw ESP scanning for loaders that have no firmware entry; and
 - next: vendor hardware qualification for unusual short-form device paths.
 
+## PR #6 — animated boot-card interactions
+
+- bounded six-frame focus cross-fades after explicit navigation input;
+- Arrow, Tab, Home, End, Page Up, and Page Down navigation across dynamic
+  four-card pages;
+- no countdown, background focus movement, or automatic boot;
+- host coverage for easing overflow guards and deterministic menu frames; and
+- OVMF framebuffer validation after two real keyboard focus transitions.
+
+PR #6 does not change Linux or Windows installer capabilities. In particular,
+the Windows package remains a read-only scan preview until its native
+transaction, rollback, and restore milestone is complete.
+
 ## 0.10.0-alpha1 — dynamic public foundation
 
 - GPL-3.0 repository foundation
