@@ -40,8 +40,9 @@ The renderer provides clipped pixels, solid and alpha rectangles, borders,
 lines, horizontal and vertical gradients, embedded monochrome images, scaled
 5×7 text, text measurement, left/center/right alignment, and frame
 presentation. Per-pixel operations do not allocate memory. The procedural
-APEX32 shield/aperture emblem is original project artwork and has no filesystem
-or third-party asset dependency.
+APEX32 shield/aperture emblem remains an original, embedded project asset
+available to later scenes, but the startup animation uses the previously
+approved APEX32 Secure text-and-frame sequence and does not insert the emblem.
 
 OS identity is separate from drawing mechanics. `Assets/OsIdentity` owns the
 token registry, accent colors, and marks. `Menu/CardLayout` owns bounded
@@ -78,9 +79,10 @@ an exact screenshot.
 ## Current limits and host safety
 
 This milestone does not select a different GOP mode and does not support legacy
-BIOS or non-x86_64 firmware. Native `Boot####` discovery now supports complete
-cross-ESP device paths; raw ESP scanning is still required for loaders that do
-not have firmware entries.
+BIOS or non-x86_64 firmware. Complete native `Boot####` device paths are
+retained only for configuration-free recovery discovery. Installed systems use
+the scanner-selected same-ESP paths until cross-ESP handoff passes a dedicated
+physical-hardware matrix.
 
 **PR #4 does not install APEX32, mount or write the host EFI System Partition,
 or modify host UEFI variables.** Its real-firmware checks use a temporary

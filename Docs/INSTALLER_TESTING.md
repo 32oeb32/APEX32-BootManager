@@ -33,18 +33,20 @@ sudo apt install --yes \
 ```
 
 A graphical PolicyKit authentication agent is also required for the real ESP
-scan. Desktop environments such as GNOME and KDE normally provide one. On
-Hyprland under Kali, install and start `hyprpolkitagent`:
+scan. Desktop environments such as GNOME and KDE normally provide one. The
+Debian package recommends compatible agents. When `hyprpolkitagent` is
+installed on Kali/Hyprland, APEX32 starts its user service automatically before
+scan, install, or restore. A release user does not type a `systemctl` command.
+
+Contributors building from source may install the missing dependency once:
 
 ```bash
 sudo apt install --yes hyprpolkitagent
-systemctl --user start hyprpolkitagent.service
-systemctl --user is-active hyprpolkitagent.service
 ```
 
-The final command must print `active`. Starting this user service does not grant
-APEX32 permanent root access; it only provides the desktop password dialog used
-by PolicyKit.
+Starting this user service does not grant APEX32 permanent root access; it only
+provides the desktop password dialog used by PolicyKit. APEX32 starts only the
+known fixed unit, without a shell or elevated process.
 
 ## 2. Clone a clean copy
 
@@ -92,6 +94,7 @@ PASS: restore failure rolled back safely, then full restore removed state
 PASS: transaction test binary was confined to its declared temporary ESP
 PASS: helper enforced scan-only install gate and refused unprivileged scan
 PASS: hardware-install opt-in required firmware and the mock ESP was unchanged
+PASS: installed Hyprland graphical authorization can start without terminal commands
 PASS: regular-user installer test completed without sudo or terminal authentication
 ```
 
@@ -137,12 +140,6 @@ button. Close the window after inspection.
 
 ## 5. Perform the authorized read-only ESP scan
 
-Confirm the graphical authorization agent is running. Hyprland users can use:
-
-```bash
-systemctl --user is-active hyprpolkitagent.service
-```
-
 Launch the regular-user GUI:
 
 ```bash
@@ -165,17 +162,22 @@ it does not write files or change NVRAM during this operation.
 
 ## Troubleshooting
 
-### Terminal password prompt or `No session for cookie`
+### No graphical authorization dialog
 
-The graphical PolicyKit agent is missing or inactive. Cancel the prompt and
-check:
+The package normally installs or reuses a compatible PolicyKit agent and the
+GUI starts the known Kali/Hyprland unit automatically. If the GUI still reports
+that no agent is available, record the desktop environment and package list for
+the qualification report. Do not ask an end user to start a service manually.
+
+Contributors may inspect the session while diagnosing a packaging issue:
 
 ```bash
 systemctl --user --no-pager --full status hyprpolkitagent.service || true
 pgrep -af hyprpolkitagent || true
 ```
 
-Do not keep retrying a terminal password prompt.
+APEX32 disables PolicyKit's internal text agent, so it must never display or
+accept an administrator password inside a terminal.
 
 ### `pkexec` is missing
 

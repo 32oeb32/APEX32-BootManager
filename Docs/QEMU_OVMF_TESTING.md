@@ -32,6 +32,7 @@ Build the firmware with the pinned EDK II revision, then run:
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
 ./Tools/test-qemu-ovmf-native-discovery.sh
+./Tools/test-qemu-ovmf-config-precedence.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ./Tools/test-qemu-ovmf-installer-lifecycle.sh
@@ -43,6 +44,7 @@ Expected result:
 PASS: APEX32 reached a stable OVMF framebuffer (800x600, ...)
 PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry
 PASS: APEX32 discovered Boot7A33 and launched its native device path
+PASS: selected configuration ignored unrelated Boot#### entries and used the same-ESP handoff
 PASS: APEX32 completed a real UEFI handoff to the linux test payload (...)
 PASS: APEX32 completed a real UEFI handoff to the windows test payload (...)
 PASS: APEX32 launched real embedded-config GRUB and GRUB chainloaded the test payload
@@ -76,7 +78,8 @@ reboots the guest. Because the fallback path still contains only the seeder,
 the APEX32 framebuffer can appear after that reboot only when OVMF launches the
 new NVRAM entry.
 
-The native-discovery pass seeds private APEX32, Linux, Windows, and unknown
+The native-discovery recovery pass removes `apex32.cfg`, then seeds private
+APEX32, Linux, Windows, and unknown
 `Boot####` options in the disposable variable store. APEX32 must exclude its
 own option and the read-only `BootCurrent` option that launched it, retain the
 unknown option as a generic card, select `Boot7A33`, and
@@ -85,6 +88,13 @@ that firmware variable. Platform-internal firmware-volume applications such as
 OVMF setup and its internal shell are excluded because they are maintenance
 tools rather than operating-system targets. The host's NVRAM and ESP remain
 unreachable.
+
+The configured-precedence pass leaves those unrelated native options present
+but writes a one-entry installer configuration that selects a different
+same-ESP Kali path. It can succeed only when the configuration is authoritative
+and `FileDevicePath()` launches that selected payload. This reproduces the
+policy and handoff failure first seen on physical HP firmware without accessing
+the host ESP.
 
 The handoff pass boots APEX32 twice. QMP keyboard input selects the configured
 Kali card during the first run and the configured Windows card during the

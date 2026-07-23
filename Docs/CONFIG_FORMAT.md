@@ -10,6 +10,12 @@ The Linux installer generates this file after **Systems → Scan Now**. The
 format is intentionally bounded and simple enough to parse safely before an
 operating system is running.
 
+A valid non-empty file is the installed system's authoritative allow-list.
+Only its selected entries become cards, and each one is launched through its
+verified path on the same ESP as APEX32. Native `Boot####` enumeration is used
+only when this file is absent, malformed, or empty; firmware options are not
+merged into an installed menu.
+
 ## Schema 1
 
 ```text

@@ -52,9 +52,13 @@ configuration must never be changed by an unattended package-manager hook.
 ## Desktop authorization
 
 GNOME, KDE Plasma, Cinnamon, and similar desktops normally start a graphical
-PolicyKit agent automatically. Minimal compositors must also run a compatible
-agent. APEX32 disables PolicyKit's terminal authentication agent and fails
-closed with a clear GUI error when no graphical agent is available.
+PolicyKit agent automatically. The package recommends compatible agents for
+minimal compositors. On Kali/Hyprland, the GUI starts the installed
+`hyprpolkitagent.service` in the current user session before scan, install, or
+restore. This uses a fixed executable and unit name, no shell, and no elevated
+service manager. APEX32 disables PolicyKit's terminal authentication agent and
+fails closed with a clear GUI error when no graphical agent is available.
+Normal users never type a service-start command.
 
 ## Contributor package gate
 
@@ -71,7 +75,9 @@ temporary directory and verifies:
 - the installed helper path matches the PolicyKit policy;
 - the firmware matches the verified EDK II output byte-for-byte;
 - only the package build reports `INSTALL|1` and `RESTORE|1`;
-- terminal authentication remains disabled; and
+- terminal authentication remains disabled;
+- package metadata recommends compatible graphical PolicyKit agents and the
+  GUI auto-starts the known Kali/Hyprland unit; and
 - runtime metadata requires `efibootmgr`, `pkexec`, and `util-linux` together
   with portable Qt dependency alternatives for Ubuntu, Debian, and Kali
   package naming.

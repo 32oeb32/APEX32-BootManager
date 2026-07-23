@@ -5,7 +5,6 @@ extern "C" {
 }
 
 #include "Fonts/Font5x7.hpp"
-#include "Assets/ApexEmblem.hpp"
 #include "Renderer/GopRenderer.hpp"
 #include "Themes/DefaultTheme.hpp"
 
@@ -15,7 +14,6 @@ namespace {
 
 constexpr CHAR8 kPrimaryTitle[] = "APEX32";
 constexpr CHAR8 kSecondaryTitle[] = "S E C U R E";
-constexpr CHAR8 kResolutionPrefix[] = "GOP ";
 constexpr UINTN kRevealSteps = 32;
 constexpr UINTN kExitSteps = 24;
 constexpr UINTN kFrameDurationMicroseconds = 25'000;
@@ -152,50 +150,6 @@ void DrawGlowLine(
   return gBS->Stall(Microseconds);
 }
 
-void AppendDecimal(
-    CHAR8* Buffer,
-    const UINTN Capacity,
-    UINTN* Offset,
-    UINTN Value) noexcept {
-  if ((Buffer == nullptr) || (Offset == nullptr) || (Capacity == 0U)) {
-    return;
-  }
-  CHAR8 Digits[24]{};
-  UINTN Count = 0U;
-  do {
-    Digits[Count++] = static_cast<CHAR8>('0' + (Value % 10U));
-    Value /= 10U;
-  } while ((Value > 0U) && (Count < sizeof(Digits)));
-  while ((Count > 0U) && ((*Offset + 1U) < Capacity)) {
-    Buffer[(*Offset)++] = Digits[--Count];
-  }
-  Buffer[*Offset] = '\0';
-}
-
-void FormatResolution(
-    const GopRenderer& Renderer,
-    CHAR8* Buffer,
-    const UINTN Capacity) noexcept {
-  if ((Buffer == nullptr) || (Capacity == 0U)) {
-    return;
-  }
-  UINTN Offset = 0U;
-  for (UINTN Index = 0U;
-       (kResolutionPrefix[Index] != '\0') && ((Offset + 1U) < Capacity);
-       ++Index) {
-    Buffer[Offset++] = kResolutionPrefix[Index];
-  }
-  Buffer[Offset] = '\0';
-  AppendDecimal(Buffer, Capacity, &Offset, Renderer.PhysicalWidth());
-  if ((Offset + 3U) < Capacity) {
-    Buffer[Offset++] = ' ';
-    Buffer[Offset++] = 'X';
-    Buffer[Offset++] = ' ';
-    Buffer[Offset] = '\0';
-  }
-  AppendDecimal(Buffer, Capacity, &Offset, Renderer.PhysicalHeight());
-}
-
 }  // namespace
 
 EFI_STATUS IntroAnimation::Play(GopRenderer& Renderer) noexcept {
@@ -252,11 +206,22 @@ EFI_STATUS IntroAnimation::RenderFrame(
       (Renderer.Height() > FrameHeight)
           ? (Renderer.Height() - FrameHeight) / 2U
           : 0;
+  const UINTN PrimaryWidth = Renderer.MeasureText(kPrimaryTitle, TitleScale);
+  const UINTN SecondaryWidth =
+      Renderer.MeasureText(kSecondaryTitle, SubtitleScale);
   const UINTN PrimaryHeight = font5x7::kGlyphHeight * TitleScale;
   const UINTN SecondaryHeight = font5x7::kGlyphHeight * SubtitleScale;
   const UINTN TextGap = 2U * Unit;
   const UINTN TextHeight = PrimaryHeight + TextGap + SecondaryHeight;
 
+  const UINTN PrimaryX =
+      (Renderer.Width() > PrimaryWidth)
+          ? (Renderer.Width() - PrimaryWidth) / 2U
+          : 0;
+  const UINTN SecondaryX =
+      (Renderer.Width() > SecondaryWidth)
+          ? (Renderer.Width() - SecondaryWidth) / 2U
+          : 0;
   const UINTN StartY =
       (Renderer.Height() > TextHeight)
           ? (Renderer.Height() - TextHeight) / 2U
@@ -272,9 +237,6 @@ EFI_STATUS IntroAnimation::RenderFrame(
   const UINTN AccentWidth =
       ScaleDimension(AccentMaximumWidth, AccentIntensity);
   const UINTN AccentX = FrameX + ((FrameWidth - AccentWidth) / 2U);
-  const UINTN EmblemSize = 3U * Unit;
-  CHAR8 Resolution[48]{};
-  FormatResolution(Renderer, Resolution, sizeof(Resolution));
 
   Renderer.BeginFrame(AnimatedColor(
       theme::kBackground,
@@ -324,46 +286,24 @@ EFI_STATUS IntroAnimation::RenderFrame(
           AccentIntensity,
           SceneIntensity));
 
-  apexemblem::Draw(
-      Renderer,
-      Renderer.Width() / 2U,
-      FrameY + Unit,
-      EmblemSize,
-      AnimatedColor(
-          theme::kCyanCore,
-          TitleIntensity,
-          SceneIntensity));
-
-  Renderer.DrawTextAligned(
+  Renderer.DrawText(
       kPrimaryTitle,
-      Renderer.Width() / 2U,
+      PrimaryX,
       StartY,
       TitleScale,
       AnimatedColor(
           theme::kPrimaryText,
           TitleIntensity,
-          SceneIntensity),
-      TextAlignment::Center);
-  Renderer.DrawTextAligned(
+          SceneIntensity));
+  Renderer.DrawText(
       kSecondaryTitle,
-      Renderer.Width() / 2U,
+      SecondaryX,
       StartY + PrimaryHeight + TextGap,
       SubtitleScale,
       AnimatedColor(
           theme::kSecondaryText,
           SubtitleIntensity,
-          SceneIntensity),
-      TextAlignment::Center);
-  Renderer.DrawTextAligned(
-      Resolution,
-      Renderer.Width() / 2U,
-      Renderer.Height() - (3U * Unit),
-      (Unit >= 10U) ? (Unit / 10U) : 1U,
-      AnimatedColor(
-          theme::kCyanDim,
-          SubtitleIntensity,
-          SceneIntensity),
-      TextAlignment::Center);
+          SceneIntensity));
 
   if (AccentWidth > 0) {
     const UINTN NodeSize = 2U * Thickness;

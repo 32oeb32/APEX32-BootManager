@@ -8,6 +8,8 @@ Cloning, compiling, and terminal commands are contributor workflows only.
 - Linux Qt GUI for safe loader discovery and preview.
 - Read-only ESP scan through a narrow PolicyKit helper when required.
 - Graphical authorization only; `pkexec` terminal fallback is disabled.
+- Debian package recommendations provide a graphical PolicyKit agent and the
+  GUI auto-starts the known Kali/Hyprland user unit when installed.
 - Source builds keep hardware installation compiled out in both GUI and
   helper.
 - The CI-built Debian beta package is the only build mode that embeds verified
@@ -41,11 +43,12 @@ Cloning, compiling, and terminal commands are contributor workflows only.
 Windows support requires a native backend; the Linux helper and PolicyKit code
 will not be reused as a shortcut.
 
-The implemented package covers steps 1–6 with one setup executable, standard
-UAC elevation, automatic temporary ESP mounting, a native firmware-variable
-store, read-back verification, and graphical restore. CI uses fake variables
-on Windows and a real private-variable lifecycle under OVMF. Live-hardware
-steps 1–6 remain the final qualification gate before public stable release.
+The implemented package covers steps 1–6 in code with one setup executable,
+standard UAC elevation, automatic temporary ESP mounting, a native
+firmware-variable store, read-back verification, and graphical restore. CI
+uses fake variables on Windows and a real private-variable lifecycle under
+OVMF. It is not a release candidate until an isolated Windows UEFI VM passes
+the complete GUI/reboot/restore flow, followed by physical Windows hardware.
 
 ## Release gates
 
@@ -64,6 +67,10 @@ steps 1–6 remain the final qualification gate before public stable release.
   installing the package on the CI host.
 - Completed: install, reinstall, desktop/AppStream validation, and purge on a
   disposable CI runner that refuses hosts with an ESP or EFI variables.
+- Completed with a failed candidate: first HP/Kali install and graphical
+  restore; boot handoff failed and is tracked by the PR #10 corrective gate.
+- Corrected Linux candidate must pass every selected OS on the same hardware.
+- Windows must pass a snapshot-backed UEFI VM before physical qualification.
 - Multi-disk and multi-ESP discovery with explicit device identity.
 - Live-hardware install, reboot, reinstall, restore, and independent recovery
   validation on the release machine matrix.

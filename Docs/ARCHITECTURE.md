@@ -8,8 +8,8 @@ The UEFI application is freestanding C++20 built with EDK II. It owns no
 network stack and performs no NVRAM writes. Its responsibilities are limited to:
 
 1. initialize GOP and play the APEX32 Secure intro;
-2. read and validate bounded active `Boot####` load options in `BootOrder`;
-3. merge and validate the bounded `apex32.cfg` fallback;
+2. load the bounded installer `apex32.cfg` allow-list when it is present;
+3. otherwise read bounded active `Boot####` options as a recovery fallback;
 4. render name-only OS cards and read explicit keyboard input; and
 5. hand the selected loader to UEFI `LoadImage` and `StartImage`.
 
@@ -35,10 +35,11 @@ the EFI System Partition for `.efi` applications, recognize common vendor
 paths, allow entries to be selected, generate schema 1, and request platform
 graphical authorization before any privileged operation.
 
-Cards are not hardcoded. Firmware performs read-only native `BootOrder` and
-`Boot####` discovery, retains complete validated device paths for cross-ESP
-handoff, and merges up to 32 scanner records as a fallback. Unknown active
-load options receive the generic identity and remain selectable. See
+Cards are not hardcoded. The installer writes up to 32 selected scanner
+records as an authoritative same-ESP allow-list. If that configuration is
+absent or empty, firmware performs bounded read-only native `BootOrder` and
+`Boot####` recovery discovery. Unknown active load options receive the generic
+identity and remain selectable in that fallback mode. See
 [Native UEFI boot discovery](NATIVE_BOOT_DISCOVERY.md).
 
 The privileged helper has a narrow interface. It validates all paths, creates

@@ -22,12 +22,17 @@ append active options that are not listed in `BootOrder`.
 All multi-byte fields are decoded from bytes, so unaligned firmware data is
 never dereferenced as an integer or structure.
 
-## Ordering and fallback
+## Installed configuration and recovery fallback
 
-Valid entries appear in `BootOrder` order. Active `Boot####` variables omitted
-from `BootOrder` are appended. The installer-generated `apex32.cfg` remains a
-portable fallback and is merged after firmware discovery. Entries with the
-same case-insensitive EFI file path are deduplicated.
+When a valid, non-empty installer-generated `apex32.cfg` is present, it is an
+authoritative allow-list. APEX32 renders only those selected entries and uses
+their verified same-ESP file paths. Firmware variables are not merged into an
+installed menu. This prevents stale, unselected, or cross-disk `Boot####`
+options from replacing a selected configuration entry.
+
+Native discovery runs only when no usable non-empty configuration exists. In
+that recovery mode, valid entries appear in `BootOrder` order and active
+`Boot####` variables omitted from `BootOrder` are appended.
 
 Known names and file paths resolve through `Assets/OsIdentity`. A future or
 unrecognized description receives the generic silver APEX32 identity and
@@ -37,11 +42,12 @@ launch.
 
 ## Handoff
 
-Firmware entries are handed directly to UEFI `LoadImage()` and `StartImage()`
-using the validated device path copied from the load option. Configuration
-entries continue to use a same-ESP `FileDevicePath()`. Failures return to the
-menu with a visible EFI stage and status instead of changing `BootNext`,
-resetting the machine, or silently falling through.
+Installed configuration entries use a same-ESP `FileDevicePath()` and are the
+qualified production handoff. Recovery-fallback firmware entries are handed
+directly to UEFI `LoadImage()` and `StartImage()` using the validated device
+path copied from the load option. Failures return to the menu with a visible
+EFI stage and status instead of changing `BootNext`, resetting the machine, or
+silently falling through.
 
 Some vendor-specific boot options are BDS policies rather than loadable EFI
 images. APEX32 displays structurally valid active options, but `LoadImage()`
@@ -58,6 +64,14 @@ its signature payload:
 
 ```bash
 ./Tools/test-qemu-ovmf-native-discovery.sh
+```
+
+A separate regression gate seeds unrelated native options while installing a
+one-entry configuration, then requires APEX32 to ignore the native entries and
+launch the selected same-ESP loader:
+
+```bash
+./Tools/test-qemu-ovmf-config-precedence.sh
 ```
 
 The script never reads or writes the host EFI System Partition or host UEFI
