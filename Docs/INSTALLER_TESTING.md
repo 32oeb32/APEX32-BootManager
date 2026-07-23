@@ -211,8 +211,10 @@ APEX32 source tree.
 The default source build rejects the helper's `install` operation even when
 invoked directly. Do not bypass the compile-time gate. Only the package builder
 may enable installation, and the resulting candidate remains unreleased until
-live-hardware restore, multi-ESP, Secure Boot, recovery-media, and signing gates
-pass.
+its platform qualification gates pass. The corrected Linux candidate completed
+the recorded HP/Kali install, both selected OS handoffs, and graphical restore.
+Windows VM and physical qualification, broader hardware, Secure Boot,
+recovery-media, and signing remain open.
 
 ## End-user packages and Windows
 
@@ -222,8 +224,8 @@ PolicyKit dialog. The Windows candidate is one NSIS setup executable that uses
 the standard UAC consent dialog. Neither packaged flow requires a terminal.
 The CI-built Windows package now enables scan, transactional install,
 make-default, and graphical restore; ordinary source builds keep those controls
-locked unless an explicitly verified firmware payload is supplied. Live
-hardware and signing qualification still precede public release.
+locked unless an explicitly verified firmware payload is supplied. Windows VM
+and physical hardware plus release signing still precede Windows publication.
 
 ## Debian package candidate
 

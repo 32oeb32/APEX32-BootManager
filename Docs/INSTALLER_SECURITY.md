@@ -79,15 +79,18 @@ transaction.
 The Windows lifecycle executable creates its ESP with `QTemporaryDir`, injects
 failure points, verifies rollback and restore, and checks a sentinel outside
 the temporary ESP. A second executable runs `NativeFirmwareStore` against
-in-memory variables and verifies new-entry creation, existing-entry reuse,
-promotion failure rollback, exact `BootOrder` restore, and Secure Boot state
-parsing. Neither executable is installed by CMake or CPack.
+in-memory variables and verifies new-entry creation, same-ESP entry reuse,
+cross-ESP isolation, promotion failure rollback, exact `BootOrder` restore,
+ambiguous-identity failure, and Secure Boot state parsing. Neither executable
+is installed by CMake or CPack.
 
 Production uses `GetFirmwareEnvironmentVariableExW` and
 `SetFirmwareEnvironmentVariableExW` after enabling the narrowly scoped
-`SE_SYSTEM_ENVIRONMENT_NAME` privilege. It rejects duplicate active APEX32
-entries, malformed load options, missing ESP device paths, and unexpected
-changes to its reserved boot number. It never parses localized BCDEdit output.
+`SE_SYSTEM_ENVIRONMENT_NAME` privilege. It reuses an APEX32 entry only when its
+GPT hard-drive node matches Windows Boot Manager, preserves same-named entries
+on other ESPs, and rejects duplicate same-ESP entries, malformed load options,
+missing or ambiguous Windows ESP identities, and unexpected changes to its
+reserved boot number. It never parses localized BCDEdit output.
 
 The OVMF job provides the real variable-writing gate: inside private firmware
 it creates and promotes an APEX32 entry, restores the exact original order,

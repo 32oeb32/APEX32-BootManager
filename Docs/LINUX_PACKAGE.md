@@ -1,5 +1,8 @@
 # Linux package and zero-terminal installation
 
+End users should follow [Install APEX32 on Kali Linux](INSTALL_KALI.md). The
+remainder of this document describes packaging and contributor verification.
+
 The APEX32 Linux beta is delivered as an `amd64` Debian package for Debian,
 Ubuntu, Kali, and compatible desktop systems. Cloning and compiling are
 contributor workflows; release users do not need a terminal.
@@ -95,6 +98,8 @@ official Kali rolling container and launches its packaged capability probe.
 This keeps one Debian-family artifact while preventing build-host-specific Qt
 package names from reaching users again.
 
-The candidate remains unreleased until the hardware, multi-ESP, Secure Boot,
-recovery-media, and release-signing gates in
+The corrected candidate passed the recorded HP/Kali physical install, Kali and
+BlackArch handoff, and graphical restore sequence. It remains an unsigned beta
+candidate until release publication and the remaining broader-hardware,
+Secure Boot, recovery-media, and signing gates in
 [the GUI installer plan](GUI_INSTALLER_PLAN.md) are complete.

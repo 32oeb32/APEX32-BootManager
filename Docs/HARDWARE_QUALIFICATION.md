@@ -45,25 +45,26 @@ The candidate is therefore **failed and not releasable**, despite its earlier
 green CI runs. The transaction/recovery design is supported by physical
 evidence; the boot-selection and handoff design required correction.
 
-## Corrective candidate gates
+## HP Victus / Kali — corrected v0.11.0-beta1 candidate
 
-Before Linux publication, the corrected candidate must pass on the same
-machine without manual service or firmware commands:
+The PR #10 corrective candidate was retested on the same machine without
+manual PolicyKit service or firmware commands. The complete result passed:
 
-1. package install and launch from the desktop;
-2. automatic graphical PolicyKit agent availability;
-3. scan showing the expected loaders;
-4. install with only Kali and BlackArch selected;
-5. reboot into the approved intro and exactly two cards;
-6. boot Kali successfully;
-7. reboot and boot BlackArch successfully;
-8. reinstall/update without duplicates;
-9. graphical restore; and
-10. direct Kali boot with exact file and `BootOrder` restoration verified.
+- the graphical PolicyKit agent became available automatically;
+- the scan found the expected Kali, BlackArch, and recovery loaders;
+- only Kali and BlackArch were selected for the installed configuration;
+- installation completed transactionally with one APEX32 firmware entry;
+- reboot displayed the approved intro without the rejected diamond scene;
+- exactly the two selected operating-system cards appeared;
+- the Kali card successfully started Kali;
+- the BlackArch card successfully started BlackArch;
+- graphical Recovery reported verified restoration; and
+- the machine subsequently booted Kali normally.
 
-The candidate must also pass the isolated configured-precedence OVMF test,
-which seeds unrelated native options but requires the selected same-ESP loader
-to be the only card and successful handoff.
+The configured-precedence OVMF test also passes while unrelated native options
+are present. Together, these results complete the corrected Linux physical
+qualification for this machine. Broader vendor coverage, signed artifacts,
+Secure Boot, and recovery-media qualification remain separate release gates.
 
 ## Windows boundary
 
@@ -81,3 +82,9 @@ publication it must pass, in order:
 
 No public release claim may be based only on scripted static tests or a
 synthetic Windows-path payload.
+
+PR #11 additionally binds Windows transactions to the GPT hard-drive identity
+used by Windows Boot Manager. Its fake-variable tests cover a separate
+Linux-side APEX32 entry, exact Windows-side restore, and ambiguous-identity
+failure. This closes the code-level multi-ESP blocker but does not replace the
+VM or physical Windows gates above.

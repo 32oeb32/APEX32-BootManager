@@ -1,5 +1,8 @@
 # Windows graphical installation and recovery
 
+For the concise end-user flow and current release warning, see
+[Install APEX32 on Windows](INSTALL_WINDOWS.md).
+
 The CI-built Windows qualification package contains the same verified
 `Apex32BootManager.efi` artifact used by the Linux package. Release users
 will eventually download one `APEX32-Community-Setup.exe`, install it normally,
