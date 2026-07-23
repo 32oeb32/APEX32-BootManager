@@ -31,9 +31,14 @@ localized BCDEdit output.
 - The process enables only `SE_SYSTEM_ENVIRONMENT_NAME` after UAC elevation.
 - `BootOrder` and the selected `Boot####` load option are captured byte for
   byte before mutation.
-- An existing APEX32 entry is reused; duplicate active entries are rejected.
-- A new entry is derived from an existing ESP device path and receives only
-  the APEX32 file-path node and description.
+- The Microsoft boot option anchors the identity of the Windows system ESP
+  mounted by `mountvol /S`; installation fails closed when that identity is
+  unavailable.
+- An existing APEX32 entry is reused only when its GPT hard-drive device-path
+  node identifies that same ESP. A same-named entry on a Linux or recovery ESP
+  is unrelated and remains byte-for-byte untouched.
+- A new Windows-side entry is derived from the Microsoft option's device path
+  and receives only the APEX32 file-path node and description.
 - Promotion removes duplicate numbers from `BootOrder`, places APEX32 first,
   and preserves every other entry in its previous order.
 - Restore writes back the exact saved option and order, or deletes the entry
@@ -69,7 +74,8 @@ firmware:
 - runs file transaction install, reinstall, injected failure, rollback, and
   restore tests inside `QTemporaryDir`;
 - runs the native `Boot####` implementation against fake variables, including
-  entry reuse and a failed `BootOrder` commit;
+  same-ESP entry reuse, two-ESP isolation, exact restore, and a failed
+  `BootOrder` commit;
 - verifies packaged and source firmware SHA-256 values are identical;
 - installs and removes the NSIS setup silently in a temporary directory; and
 - confirms that neither test executable is included in the package.
@@ -80,7 +86,9 @@ firmware-level success exit. That synthetic gate does not boot Microsoft
 Windows or validate the packaged GUI in Windows firmware. A snapshot-backed
 Windows UEFI VM must complete scan, install, make-default, reboot, handoff, and
 restore before a real Windows machine is used. Both are mandatory before
-publication.
+publication. In particular, the first physical Windows run must confirm that
+an APEX32 entry already present on a separate Linux ESP is not reused for the
+Windows ESP transaction.
 
 ## Contributor build
 

@@ -17,6 +17,9 @@ allowing a transaction.
 
 The native backend reads and writes UEFI `Boot####` and `BootOrder` through
 `GetFirmwareEnvironmentVariableExW` and `SetFirmwareEnvironmentVariableExW`.
+It binds the transaction to the Windows system ESP by comparing the GPT
+hard-drive device-path node with Windows Boot Manager. An APEX32 option on a
+different ESP is preserved and is never mistaken for the Windows-side entry.
 It is covered by fake-variable Windows tests and a separate disposable OVMF
 lifecycle, so CI never mutates the runner's firmware. See
 [Windows graphical installation and recovery](../../Docs/WINDOWS_PRODUCTION_INSTALLER.md).

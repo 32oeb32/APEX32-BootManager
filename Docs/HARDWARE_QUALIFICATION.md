@@ -73,8 +73,11 @@ publication it must pass, in order:
 1. disposable Windows CI packaging and transaction tests;
 2. an isolated Windows UEFI virtual machine with snapshot recovery;
 3. graphical scan, install, make-default, reboot, loader handoff, and restore;
-4. a real Windows UEFI machine with recovery media available; and
-5. artifact signing and Secure Boot policy qualification.
+4. on multi-ESP systems, preservation of any Linux-ESP APEX32 entry while the
+   Windows transaction creates, verifies, and restores only its Windows-ESP
+   entry;
+5. a real Windows UEFI machine with recovery media available; and
+6. artifact signing and Secure Boot policy qualification.
 
 No public release claim may be based only on scripted static tests or a
 synthetic Windows-path payload.
