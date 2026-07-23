@@ -34,6 +34,7 @@ After building `Apex32BootManager.efi`, run:
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
 ./Tools/test-qemu-ovmf-native-discovery.sh
+./Tools/test-qemu-ovmf-config-precedence.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ./Tools/test-qemu-ovmf-installer-lifecycle.sh
@@ -43,21 +44,23 @@ This boots the real EFI application under QEMU/OVMF and validates a captured
 GOP framebuffer. The second command creates a private APEX32 `Boot####` option,
 promotes it to the first `BootOrder` entry, cold reboots OVMF, and requires the
 gateway to render through that entry. The third command navigates the real
-native firmware-entry menu and launches `Boot7A33` through its stored device
-path. The fourth command navigates the real
+native firmware-entry recovery menu and launches `Boot7A33` through its stored
+device path. The fourth command leaves unrelated `Boot####` options present,
+but requires a one-entry installer configuration to remain authoritative and
+launch its verified same-ESP target. The fifth command navigates the real
 APEX32 menu and requires successful `LoadImage()` / `StartImage()` transfer to
 test-only Linux-path and Windows-path UEFI child applications. All commands use
 only a temporary virtual ESP and private OVMF variable store. See
 [QEMU/OVMF firmware testing](../Docs/QEMU_OVMF_TESTING.md).
 
-The fifth command adds real Linux loader coverage. It builds a self-contained
+The sixth command adds real Linux loader coverage. It builds a self-contained
 GRUB EFI image with an early embedded configuration from the locally installed
 distribution package, first launches GRUB directly through APEX32, then
 launches the packaged shim which in turn starts GRUB. Both paths must chainload
 the isolated framebuffer-signature payload. Neither GRUB nor shim is stored in
 this repository.
 
-The sixth command exercises the installer-side firmware lifecycle inside the
+The seventh command exercises the installer-side firmware lifecycle inside the
 private OVMF store: create an APEX32 `Boot####` option, promote it, verify it,
 restore the exact original order, and remove the created option. It exits only
 after reading the restored variables back. No host EFI state is reachable.

@@ -150,6 +150,11 @@ if(APEX32_BUILD_DEB_PACKAGE)
     "libqt6core6t64 (>= 6.4.0) | libqt6core6 (>= 6.4.0), "
     "libqt6gui6t64 (>= 6.1.2) | libqt6gui6 (>= 6.1.2), "
     "libqt6widgets6t64 (>= 6.1.2) | libqt6widgets6 (>= 6.1.2)")
+  string(
+    CONCAT
+    CPACK_DEBIAN_PACKAGE_RECOMMENDS
+    "hyprpolkitagent | policykit-1-gnome | polkit-kde-agent-1 | "
+    "lxqt-policykit | mate-polkit")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
   set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
   set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://apex32-secure.com")

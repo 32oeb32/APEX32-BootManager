@@ -15,12 +15,16 @@ desktop GUI into a permanently privileged process.
 - The GUI passes `--disable-internal-agent` to `pkexec`, so authentication may
   use only the desktop's graphical PolicyKit agent and can never fall back to
   a terminal password prompt.
+- The Debian package recommends compatible graphical PolicyKit agents. Before
+  authorization the GUI starts the fixed installed Kali/Hyprland user unit
+  when present, without a shell, root service manager, or terminal command.
 - The helper rejects non-root direct execution and validates the ESP mount,
   firmware source, and generated configuration before writing.
 - External programs are called with argument arrays through `QProcess`; no
   shell command string is constructed.
 - The first existing APEX32 firmware file is preserved before replacement.
-- A stable release requires live-hardware GUI restore qualification.
+- A stable release requires live-hardware install, selected-loader handoff,
+  and GUI restore qualification.
 
 The default-off install implementation depends on `findmnt`,
 `lsblk`, and `efibootmgr` at fixed `/usr/bin` paths. Packaging must declare and

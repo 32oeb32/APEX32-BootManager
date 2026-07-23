@@ -99,6 +99,18 @@ case "${TEST_MODE}" in
     QEMU_REBOOT_OPTIONS=()
     HANDOFF_ARGUMENTS=(--handoff-target linux)
     ;;
+  configured-precedence)
+    [[ -f "${SEEDER}" && -f "${LINUX_HANDOFF}" ]] || {
+      echo "error: configured-precedence test artifacts are missing; rebuild first" >&2
+      exit 2
+    }
+    FALLBACK_LOADER="${SEEDER}"
+    LINUX_LOADER_SOURCE="${LINUX_HANDOFF}"
+    LINUX_LOADER_PATH="EFI/selected-kali/grubx64.efi"
+    WAIT_SECONDS="${APEX32_QEMU_WAIT_SECONDS:-90}"
+    QEMU_REBOOT_OPTIONS=()
+    HANDOFF_ARGUMENTS=(--handoff-target linux)
+    ;;
   installer-lifecycle)
     [[ -f "${INSTALLER_LIFECYCLE}" ]] || {
       echo "error: OVMF installer lifecycle artifact is missing; rebuild first" >&2
@@ -134,7 +146,7 @@ case "${TEST_MODE}" in
     HANDOFF_ARGUMENTS=(--handoff-target windows)
     ;;
   *)
-    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, native-discovery, installer-lifecycle, handoff-linux, or handoff-windows" >&2
+    echo "error: APEX32_OVMF_TEST_MODE must be fallback, bootorder, native-discovery, configured-precedence, installer-lifecycle, handoff-linux, or handoff-windows" >&2
     exit 2
     ;;
 esac
@@ -181,9 +193,18 @@ install -m 0644 /dev/null "${ESP_ROOT}/EFI/BlackArch_Linux/grubx64.efi"
 install -Dm 0644 "${LINUX_LOADER_SOURCE}" "${ESP_ROOT}/${LINUX_LOADER_PATH}"
 install -m 0644 "${WINDOWS_LOADER_SOURCE}" "${ESP_ROOT}/EFI/Microsoft/Boot/bootmgfw.efi"
 install -m 0644 "${OVMF_VARS_PATH}" "${SANDBOX}/OVMF_VARS.fd"
-install -m 0644 \
-  "${PROJECT_ROOT}/Config/apex32.cfg.example" \
-  "${ESP_ROOT}/EFI/APEX32/apex32.cfg"
+if [[ "${TEST_MODE}" == "native-discovery" ]]; then
+  rm -f "${ESP_ROOT}/EFI/APEX32/apex32.cfg"
+elif [[ "${TEST_MODE}" == "configured-precedence" ]]; then
+  printf '%s\n' \
+    'APEX32CFG|1' \
+    'ENTRY|KALI LINUX|\EFI\selected-kali\grubx64.efi|kali' \
+    > "${ESP_ROOT}/EFI/APEX32/apex32.cfg"
+else
+  install -m 0644 \
+    "${PROJECT_ROOT}/Config/apex32.cfg.example" \
+    "${ESP_ROOT}/EFI/APEX32/apex32.cfg"
+fi
 if [[ -n "${ESP_OVERLAY}" ]]; then
   cp -a "${ESP_OVERLAY}/." "${ESP_ROOT}/"
 fi
@@ -243,6 +264,8 @@ if [[ "${TEST_MODE}" == "bootorder" ]]; then
   echo "PASS: OVMF rebooted through seeded Boot7A32 as first BootOrder entry"
 elif [[ "${TEST_MODE}" == "native-discovery" ]]; then
   echo "PASS: APEX32 discovered Boot7A33 and launched its native device path"
+elif [[ "${TEST_MODE}" == "configured-precedence" ]]; then
+  echo "PASS: selected configuration ignored unrelated Boot#### entries and used the same-ESP handoff"
 fi
 
 wait "${QEMU_PID}" 2>/dev/null || true

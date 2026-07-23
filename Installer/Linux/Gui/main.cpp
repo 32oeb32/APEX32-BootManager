@@ -215,6 +215,40 @@ void SortCandidates(QList<Candidate>* Results) {
   return {};
 }
 
+void StartKnownGraphicalAuthorizationAgent() {
+  // Full desktop environments already manage their PolicyKit agent.  Kali's
+  // Hyprland session can install hyprpolkitagent without activating
+  // graphical-session.target, leaving the service inactive after login.  If
+  // that known unit is present, start it in the current user session before
+  // pkexec is invoked.  No shell or elevated process is involved.
+  constexpr const char* kUnitCandidates[] = {
+      "/usr/lib/systemd/user/hyprpolkitagent.service",
+      "/lib/systemd/user/hyprpolkitagent.service",
+  };
+  bool UnitInstalled = false;
+  for (const char* UnitPath : kUnitCandidates) {
+    if (QFileInfo(QString::fromUtf8(UnitPath)).isFile()) {
+      UnitInstalled = true;
+      break;
+    }
+  }
+  const QString Systemctl = QStringLiteral("/usr/bin/systemctl");
+  if (!UnitInstalled || !QFileInfo(Systemctl).isExecutable()) {
+    return;
+  }
+
+  QProcess Process;
+  Process.start(
+      Systemctl,
+      {QStringLiteral("--user"),
+       QStringLiteral("start"),
+       QStringLiteral("hyprpolkitagent.service")});
+  if (!Process.waitForFinished(5000)) {
+    Process.kill();
+    Process.waitForFinished();
+  }
+}
+
 [[nodiscard]] QList<Candidate> ParseScanProtocol(
     const QString& EspRoot,
     const QByteArray& Protocol,
@@ -270,6 +304,7 @@ void SortCandidates(QList<Candidate>* Results) {
     return {};
   }
 
+  StartKnownGraphicalAuthorizationAgent();
   QProcess Process;
   Process.start(
       QStringLiteral("/usr/bin/pkexec"),
@@ -292,7 +327,9 @@ void SortCandidates(QList<Candidate>* Results) {
     *Error = QString::fromUtf8(Process.readAllStandardError()).trimmed();
     if (Error->isEmpty() ||
         Error->contains(QStringLiteral("not authorized"), Qt::CaseInsensitive) ||
-        Error->contains(QStringLiteral("no session for cookie"), Qt::CaseInsensitive)) {
+        Error->contains(QStringLiteral("no session for cookie"), Qt::CaseInsensitive) ||
+        Error->contains(QStringLiteral("no authentication agent"),
+                        Qt::CaseInsensitive)) {
       *Error = QStringLiteral(
           "graphical authorization was cancelled or no desktop PolicyKit agent is running");
     }
@@ -761,6 +798,7 @@ class InstallerWindow final : public QWidget {
         "/usr/libexec/apex32/apex32-installer-helper");
     const QString Firmware = QStringLiteral(
         "/usr/share/apex32/Apex32BootManager.efi");
+    StartKnownGraphicalAuthorizationAgent();
     QProcess Process;
     Process.start(
         QStringLiteral("/usr/bin/pkexec"),
@@ -811,6 +849,7 @@ class InstallerWindow final : public QWidget {
     }
     const QString Helper = QStringLiteral(
         "/usr/libexec/apex32/apex32-installer-helper");
+    StartKnownGraphicalAuthorizationAgent();
     QProcess Process;
     Process.start(
         QStringLiteral("/usr/bin/pkexec"),

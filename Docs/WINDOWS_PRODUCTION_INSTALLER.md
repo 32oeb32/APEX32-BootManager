@@ -1,9 +1,10 @@
 # Windows graphical installation and recovery
 
-The CI-built Windows package contains the same verified
+The CI-built Windows qualification package contains the same verified
 `Apex32BootManager.efi` artifact used by the Linux package. Release users
-download one `APEX32-Community-Setup.exe`, install it normally, and complete
-the entire boot-manager workflow in the GUI.
+will eventually download one `APEX32-Community-Setup.exe`, install it normally,
+and complete the entire boot-manager workflow in the GUI. The current artifact
+is not public-release qualified.
 
 ## User flow
 
@@ -75,8 +76,11 @@ firmware:
 
 The OVMF workflow separately creates a private boot option, promotes it,
 restores the exact original `BootOrder`, removes the option, and requires a
-firmware-level success exit. Live Windows hardware install, reboot, and
-restore qualification is intentionally deferred to the final release gate.
+firmware-level success exit. That synthetic gate does not boot Microsoft
+Windows or validate the packaged GUI in Windows firmware. A snapshot-backed
+Windows UEFI VM must complete scan, install, make-default, reboot, handoff, and
+restore before a real Windows machine is used. Both are mandatory before
+publication.
 
 ## Contributor build
 

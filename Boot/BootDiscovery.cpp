@@ -19,42 +19,6 @@ constexpr CHAR16 kConfigurationPath[] = {
 
 constexpr UINTN kConfigurationBufferCapacity = 16384U;
 
-[[nodiscard]] CHAR16 UpperAscii16(const CHAR16 Character) noexcept {
-  return ((Character >= 'a') && (Character <= 'z'))
-             ? static_cast<CHAR16>(Character - ('a' - 'A'))
-             : Character;
-}
-
-[[nodiscard]] BOOLEAN PathsEqual(
-    const CHAR16* Left,
-    const CHAR16* Right) noexcept {
-  if ((Left == nullptr) || (Right == nullptr) ||
-      (Left[0] == 0U) || (Right[0] == 0U)) {
-    return FALSE;
-  }
-  UINTN Index = 0U;
-  while ((Left[Index] != 0U) && (Right[Index] != 0U)) {
-    if (UpperAscii16(Left[Index]) != UpperAscii16(Right[Index])) {
-      return FALSE;
-    }
-    ++Index;
-  }
-  return ((Left[Index] == 0U) && (Right[Index] == 0U)) ? TRUE : FALSE;
-}
-
-[[nodiscard]] BOOLEAN IsDuplicate(
-    const BootConfiguration& Configuration,
-    const BootEntry& Candidate) noexcept {
-  for (UINTN Index = 0U; Index < Configuration.Count; ++Index) {
-    if (PathsEqual(
-            Configuration.Entries[Index].LoaderPath,
-            Candidate.LoaderPath)) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
 [[nodiscard]] BOOLEAN FileExists(
     EFI_FILE_PROTOCOL* Root,
     const CHAR16* Path) noexcept {
@@ -83,35 +47,36 @@ constexpr UINTN kConfigurationBufferCapacity = 16384U;
 
 BootConfiguration BootDiscovery::Discover(
     const EFI_HANDLE ParentImageHandle) noexcept {
+  const BootConfiguration Config = LoadSameEsp(ParentImageHandle);
+  if (!EFI_ERROR(Config.Status) && (Config.Count > 0U)) {
+    // The installer configuration is an explicit allow-list whose paths were
+    // verified on the same ESP as APEX32.  It must remain authoritative.
+    // Mixing Boot#### options ahead of it caused validated entries to be
+    // discarded as duplicates and made real firmware use an unqualified raw
+    // device path instead of the proven same-ESP handoff.
+    BootConfiguration Result = Config;
+    Result.FirmwareStatus = EFI_NOT_READY;
+    Result.ConfigStatus = EFI_SUCCESS;
+    Result.ConfigCount = Result.Count;
+    Result.FirmwareCount = 0U;
+    Result.Loaded = TRUE;
+    Result.Status = EFI_SUCCESS;
+    return Result;
+  }
+
+  // Native discovery is a recovery fallback only when no usable installer
+  // configuration exists.  It remains read-only and bounded, but it can no
+  // longer add unselected stale entries to an installed menu.
   BootConfiguration Result{};
   const EFI_STATUS FirmwareStatus = FirmwareBootDiscovery::Discover(&Result);
   Result.FirmwareStatus = FirmwareStatus;
-
-  const BootConfiguration Config = LoadSameEsp(ParentImageHandle);
   Result.ConfigStatus = Config.Status;
-  if (!EFI_ERROR(Config.Status)) {
-    for (UINTN Index = 0U;
-         (Index < Config.Count) && (Result.Count < kMaximumBootEntries);
-         ++Index) {
-      if (IsDuplicate(Result, Config.Entries[Index])) {
-        continue;
-      }
-      Result.Entries[Result.Count] = Config.Entries[Index];
-      ++Result.Count;
-      ++Result.ConfigCount;
-    }
-  }
-
-  Result.Loaded = (!EFI_ERROR(FirmwareStatus) || !EFI_ERROR(Config.Status))
-                      ? TRUE
-                      : FALSE;
-  if (Result.Loaded) {
-    Result.Status = EFI_SUCCESS;
-  } else {
-    Result.Status = (Config.Status != EFI_NOT_FOUND)
-                        ? Config.Status
-                        : FirmwareStatus;
-  }
+  Result.Loaded = !EFI_ERROR(FirmwareStatus) ? TRUE : FALSE;
+  Result.Status = Result.Loaded
+                      ? EFI_SUCCESS
+                      : ((Config.Status != EFI_NOT_FOUND)
+                             ? Config.Status
+                             : FirmwareStatus);
   return Result;
 }
 

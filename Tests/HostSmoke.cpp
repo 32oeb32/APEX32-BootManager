@@ -71,6 +71,7 @@ struct SmokeState {
   BOOLEAN KaliProbeMatched;
   BOOLEAN BlackArchProbeMatched;
   BOOLEAN ConfigProbeMatched;
+  BOOLEAN SimulateConfigMissing;
   BOOLEAN SimulateBlackArchMissing;
   UINT8 PendingTarget;
 };
@@ -456,6 +457,10 @@ EFI_STATUS EFIAPI OpenProbeFile(
 
   if (MatchesPath(FileName, kConfigExpected) == TRUE) {
     State.ConfigProbeMatched = TRUE;
+    if (State.SimulateConfigMissing) {
+      *NewHandle = nullptr;
+      return EFI_NOT_FOUND;
+    }
     *NewHandle = &ConfigFile;
     return EFI_SUCCESS;
   }
@@ -814,14 +819,36 @@ void WriteUint16(UINT8* Buffer, const UINTN Offset, const UINT16 Value) {
   gRT = nullptr;
   Passed &= Check(
       MergedConfiguration.Status == EFI_SUCCESS &&
-          MergedConfiguration.FirmwareCount == 2U &&
-          MergedConfiguration.ConfigCount == 1U &&
-          MergedConfiguration.Count == 3U,
-      "native entries and configuration fallback must merge without duplicates");
+          MergedConfiguration.FirmwareStatus == EFI_NOT_READY &&
+          MergedConfiguration.FirmwareCount == 0U &&
+          MergedConfiguration.ConfigCount == 2U &&
+          MergedConfiguration.Count == 2U,
+      "a validated installer configuration must be the authoritative menu");
   Passed &= Check(
-      std::strcmp(MergedConfiguration.Entries[2].Name,
-                  "BLACKARCH LINUX") == 0,
-      "non-duplicate configuration entries must remain available");
+      std::strcmp(MergedConfiguration.Entries[0].Name, "KALI LINUX") == 0 &&
+          std::strcmp(MergedConfiguration.Entries[1].Name,
+                      "BLACKARCH LINUX") == 0 &&
+          MergedConfiguration.Entries[0].Source ==
+              apex32::BootEntrySource::Configuration &&
+          MergedConfiguration.Entries[1].Source ==
+              apex32::BootEntrySource::Configuration,
+      "selected same-ESP entries must replace unrelated native options");
+
+  State.SimulateConfigMissing = TRUE;
+  gRT = &RuntimeServices;
+  const apex32::BootConfiguration RecoveryConfiguration =
+      apex32::BootDiscovery::Discover(ParentImageHandle);
+  gRT = nullptr;
+  State.SimulateConfigMissing = FALSE;
+  Passed &= Check(
+      RecoveryConfiguration.Status == EFI_SUCCESS &&
+          RecoveryConfiguration.ConfigStatus == EFI_NOT_FOUND &&
+          RecoveryConfiguration.FirmwareCount == 2U &&
+          RecoveryConfiguration.ConfigCount == 0U &&
+          RecoveryConfiguration.Count == 2U &&
+          RecoveryConfiguration.Entries[0].Source ==
+              apex32::BootEntrySource::Firmware,
+      "native Boot#### discovery must remain available when config is absent");
 
   apex32::BootEntry NativeEntry{};
   Passed &= Check(

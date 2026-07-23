@@ -25,6 +25,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 sandbox="$(mktemp -d -t apex32-installer-user-XXXXXX)"
 trap 'rm -rf "${sandbox}"' EXIT
 
+grep -q 'StartKnownGraphicalAuthorizationAgent' \
+  "${repo_root}/Installer/Linux/Gui/main.cpp"
+grep -q 'hyprpolkitagent.service' \
+  "${repo_root}/Installer/Linux/Gui/main.cpp"
+
 esp="${sandbox}/mock-esp"
 build_dir="${sandbox}/build"
 hardware_build_dir="${sandbox}/hardware-build"
@@ -135,4 +140,5 @@ fi
 
 echo "PASS: helper enforced scan-only install gate and refused unprivileged scan"
 echo "PASS: hardware-install opt-in required firmware and the mock ESP was unchanged"
+echo "PASS: installed Hyprland graphical authorization can start without terminal commands"
 echo "PASS: regular-user installer test completed without sudo or terminal authentication"

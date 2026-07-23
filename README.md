@@ -4,9 +4,11 @@ APEX32 is a native x86_64 UEFI boot manager written in freestanding C++20
 with EDK II and the Graphics Output Protocol. It is an independent boot
 manager, not a GRUB or rEFInd theme.
 
-The Community Edition keeps the APEX32 Secure intro and cyber-interface while
-discovering operating-system cards from existing UEFI `Boot####` entries and
-the versioned installer configuration fallback.
+The Community Edition keeps the approved APEX32 Secure intro and
+cyber-interface. An installed system renders only the operating-system cards
+selected in the versioned installer configuration. Bounded read-only
+`Boot####` discovery is retained as a recovery fallback when no usable
+configuration exists.
 Cards intentionally show only the OS mark and OS name. Permanent project
 branding and recovery links are displayed beneath the cards:
 
@@ -22,11 +24,12 @@ personal APEX32 installation or development tree.
 `0.10.0-alpha1` is the published source milestone. The merged
 `0.11.0-beta1` foundation and current one-step installer candidate add:
 
-- the hardware-tested APEX32 intro, original emblem, and reusable
-  resolution-independent GOP renderer;
+- the approved pre-graphics APEX32 intro and reusable resolution-independent
+  GOP renderer;
 - a bounded configuration parser supporting up to 32 UEFI loaders;
-- bounded, read-only `BootOrder`/`Boot####` discovery with native device-path
-  handoff across EFI System Partitions;
+- authoritative same-ESP configured handoff for installer-selected systems,
+  with bounded read-only `BootOrder`/`Boot####` discovery only when no usable
+  configuration exists;
 - paged, manual-only OS selection with no countdown or autoboot;
 - bounded animated focus cross-fades plus Arrow, Tab, Home, End, and page
   navigation;
@@ -57,11 +60,13 @@ personal APEX32 installation or development tree.
 - host tests for firmware UI, configuration, loader handoff, firmware-entry
   management, and recovery fallback behavior.
 
-This is a beta candidate, not yet a universal production installer. Existing
-firmware entries can now launch across EFI System Partitions. Raw ESP scanning
-for loaders without a `Boot####` option, signed release artifacts, additional
-distro packages, and live graphical install/reboot/restore qualification remain
-release gates.
+This is a beta candidate, not yet a universal production installer. The first
+physical HP/Kali qualification proved package safety plus graphical install and
+restore, but exposed a native-device-path boot regression. The candidate was
+restored rather than released. The corrected build must pass the same physical
+install, reboot, every-selected-OS handoff, and restore sequence before release.
+Raw multi-ESP discovery, signed artifacts, additional distro packages, and
+broader hardware qualification remain release gates.
 The Windows package now contains the reusable transaction engine, a native
 `Boot####`/`BootOrder` backend, and the same verified EFI payload as Linux.
 The Windows and OVMF workflows cover isolated file and firmware-variable
@@ -69,6 +74,8 @@ lifecycle tests without touching runner firmware. See
 [boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
 [Windows graphical installer](Docs/WINDOWS_PRODUCTION_INSTALLER.md) for the
 precise capability and qualification boundary.
+The first physical-machine results and the mandatory corrective retest are
+recorded in [hardware qualification](Docs/HARDWARE_QUALIFICATION.md).
 
 Installer contributors can run a root-refusing mock-ESP test and a visibly
 disabled safe GUI demo without touching their boot configuration. See
@@ -76,7 +83,7 @@ disabled safe GUI demo without touching their boot configuration. See
 temporary; packaged beta users will launch the installer from their desktop.
 
 The installer guide includes a complete fresh-clone workflow, dependency
-setup, expected test output, Hyprland graphical authorization setup, a safe GUI
+setup, expected test output, automatic Hyprland graphical authorization, a safe GUI
 demo, and an authorized read-only scan of the real ESP. It deliberately stops
 before installation on hardware. The source build reports `INSTALL|0`, keeps
 the Install control disabled, and rejects direct helper install requests.
@@ -91,6 +98,9 @@ files or edit NVRAM by hand. See
 
 The Debian-family release uses portable Qt dependency alternatives and CI
 installs the same package on both Ubuntu and Kali rolling before publication.
+It recommends a graphical PolicyKit agent and starts the known Kali Hyprland
+user service automatically before authorization. Normal users do not run a
+`systemctl` command.
 
 ## One-step user installation
 
@@ -141,6 +151,7 @@ The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
 ./Tools/test-qemu-ovmf.sh
 ./Tools/test-qemu-ovmf-bootorder.sh
 ./Tools/test-qemu-ovmf-native-discovery.sh
+./Tools/test-qemu-ovmf-config-precedence.sh
 ./Tools/test-qemu-ovmf-handoff.sh
 ./Tools/test-qemu-ovmf-linux-loaders.sh
 ```

@@ -96,6 +96,19 @@ for dependency in efibootmgr pkexec util-linux; do
   }
 done
 
+recommends="$(dpkg-deb --field "${package}" Recommends)"
+for agent in \
+  hyprpolkitagent \
+  policykit-1-gnome \
+  polkit-kde-agent-1 \
+  lxqt-policykit \
+  mate-polkit; do
+  [[ "${recommends}" == *"${agent}"* ]] || {
+    echo "FAIL: graphical PolicyKit recommendation is missing: ${agent}" >&2
+    exit 5
+  }
+done
+
 for alternatives in \
   'libqt6core6t64 (>= 6.4.0) | libqt6core6 (>= 6.4.0)' \
   'libqt6gui6t64 (>= 6.1.2) | libqt6gui6 (>= 6.1.2)' \
@@ -109,3 +122,4 @@ done
 echo "PASS: Debian package contains GUI, helper, policy, desktop/AppStream metadata, icon, firmware, and recovery documentation"
 echo "PASS: packaged GUI reports INSTALL|1, RESTORE|1, and terminal authorization disabled"
 echo "PASS: package metadata supports Ubuntu, Debian, and Kali Qt runtime names"
+echo "PASS: package recommends graphical PolicyKit agents and needs no terminal agent startup"

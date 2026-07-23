@@ -5,7 +5,7 @@
 - reusable clipped GOP renderer with canonical back buffer
 - 1920×1080 logical canvas with centered letterboxing
 - alpha blending, gradients, borders, lines, images, and aligned embedded text
-- original APEX32 emblem
+- embedded original APEX32 emblem asset (not inserted into the approved intro)
 - dynamic one-to-four-card pages for up to 32 validated entries
 - pluggable OS identity registry and generic unknown-loader fallback
 - resolution, overflow, and regional OVMF framebuffer validation
@@ -18,12 +18,15 @@ the separate PR #5 milestone below.
 
 - completed: bounded read-only `BootOrder` and `Boot####` enumeration;
 - completed: active load-option parsing with malformed-entry rejection;
-- completed: APEX32 self-entry filtering and firmware/config deduplication;
-- completed: native device-path `LoadImage()` / `StartImage()` handoff;
+- completed: APEX32 self-entry filtering;
+- completed: native device-path `LoadImage()` / `StartImage()` handoff in
+  configuration-free recovery mode;
 - completed: generic cards for future and unknown EFI descriptions;
 - completed: isolated OVMF discovery and handoff through private variables;
 - next: raw ESP scanning for loaders that have no firmware entry; and
-- next: vendor hardware qualification for unusual short-form device paths.
+- completed in PR #10: installed configuration is authoritative and uses the
+  qualified same-ESP handoff instead of native path replacement; and
+- next: broader vendor qualification for configuration-free recovery paths.
 
 ## PR #6 — animated boot-card interactions
 
@@ -75,6 +78,29 @@ narrow real firmware store behind this already-tested transaction contract.
 
 PR #9 does not claim live-hardware qualification or a signed Secure Boot
 release. Those are the consolidated final release gates.
+
+## PR #10 — first-hardware qualification regressions
+
+The first HP/Kali qualification passed package safety, graphical scan,
+transactional install, make-default, and graphical restore. Reboot exposed two
+firmware regressions: native entries replaced the installer-selected same-ESP
+paths, and unselected stale GRUB/Windows options appeared in the menu. The test
+also showed that Kali/Hyprland could have no active graphical PolicyKit agent
+after package installation.
+
+- restore the previously approved APEX32 Secure intro without the inserted
+  diamond/emblem scene;
+- make a valid non-empty installer configuration an authoritative allow-list;
+- use native `Boot####` discovery only when no usable configuration exists;
+- add a private-OVMF precedence test with unrelated native entries present;
+- recommend graphical PolicyKit agents in the Debian package;
+- start the known Kali/Hyprland user agent automatically before authorization;
+- preserve terminal authentication as disabled and fail closed; and
+- document the physical qualification evidence and mandatory retest sequence.
+
+PR #10 creates a new candidate; it does not turn the failed first reboot into a
+pass. Linux must complete the full physical retest, and Windows must separately
+pass an isolated Windows UEFI VM plus real Windows hardware before release.
 
 ## 0.10.0-alpha1 — dynamic public foundation
 
