@@ -54,7 +54,11 @@ grep -q 'ActiveOption' \
   "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
 grep -q 'Order.Attributes != Snapshot.BootOrderAttributes' \
   "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
+grep -q 'SameEspIdentity' \
+  "${windows_root}/Transaction/WindowsFirmwareStore.cpp"
 grep -q 'FakeVariables' \
+  "${project_root}/Tests/WindowsNativeFirmwareStoreTest.cpp"
+grep -q 'OtherEspApex' \
   "${project_root}/Tests/WindowsNativeFirmwareStoreTest.cpp"
 ! grep -R -q -E 'bcdedit(\.exe)?' "${windows_root}"
 grep -q 'test-qemu-ovmf-installer-lifecycle.sh' \
@@ -71,4 +75,4 @@ gui_start_line="$(grep -n 'QApplication Application' \
   exit 1
 }
 
-echo "PASS: Windows package contains verified firmware, native-variable transactions, isolated lifecycle tests, and compile-time hardware gates"
+echo "PASS: Windows package contains verified firmware, partition-aware native transactions, isolated lifecycle tests, and compile-time hardware gates"

@@ -19,6 +19,7 @@ constexpr auto kApexLoaderPath = "\\EFI\\APEX32\\Apex32BootManager.efi";
 constexpr quint8 kMediaDevicePath = 0x04;
 constexpr quint8 kHardDriveDevicePath = 0x01;
 constexpr quint8 kFilePathDevicePath = 0x04;
+constexpr quint16 kHardDriveDevicePathLength = 42;
 
 bool SetError(QString *Error, const QString &Message) {
   if (Error != nullptr) {
@@ -100,6 +101,8 @@ QString NormalizeLoaderPath(QString Path) {
 struct LoadOptionLayout {
   qsizetype DevicePathStart = 0;
   qsizetype DevicePathEnd = 0;
+  qsizetype HardDriveNodeStart = 0;
+  qsizetype HardDriveNodeLength = 0;
   qsizetype FilePathNodeStart = 0;
   qsizetype FilePathNodeLength = 0;
 };
@@ -142,7 +145,14 @@ bool ParseLoadOptionLayout(
       return SetError(Error, QStringLiteral("A device-path node has invalid bounds."));
     }
     if (Type == kMediaDevicePath && SubType == kHardDriveDevicePath) {
+      if (HardDriveSeen || Length != kHardDriveDevicePathLength) {
+        return SetError(
+            Error,
+            QStringLiteral("The ESP hard-drive device-path node is invalid."));
+      }
       HardDriveSeen = true;
+      Layout->HardDriveNodeStart = Cursor;
+      Layout->HardDriveNodeLength = Length;
     }
     if (Type == kMediaDevicePath && SubType == kFilePathDevicePath) {
       if (!HardDriveSeen || Length < 6 || ((Length - 4) % 2) != 0) {
@@ -157,6 +167,29 @@ bool ParseLoadOptionLayout(
   }
   return SetError(
       Error, QStringLiteral("The load option has no ESP file-path node."));
+}
+
+bool SameEspIdentity(
+    const QByteArray &Left,
+    const QByteArray &Right,
+    bool *Same,
+    QString *Error) {
+  if (Same == nullptr) {
+    return SetError(
+        Error, QStringLiteral("The ESP identity result is unavailable."));
+  }
+  LoadOptionLayout LeftLayout;
+  LoadOptionLayout RightLayout;
+  if (!ParseLoadOptionLayout(Left, &LeftLayout, Error) ||
+      !ParseLoadOptionLayout(Right, &RightLayout, Error)) {
+    return false;
+  }
+  *Same = LeftLayout.HardDriveNodeLength == RightLayout.HardDriveNodeLength &&
+      Left.mid(LeftLayout.HardDriveNodeStart, LeftLayout.HardDriveNodeLength) ==
+          Right.mid(
+              RightLayout.HardDriveNodeStart,
+              RightLayout.HardDriveNodeLength);
+  return true;
 }
 
 bool LoadOptionPath(
@@ -499,11 +532,17 @@ bool NativeFirmwareStore::Snapshot(QJsonObject *State, QString *Error) {
     return false;
   }
 
+  struct ApexCandidate {
+    quint16 Number = 0;
+    FirmwareVariableValue Variable;
+  };
+
   int ApexNumber = -1;
-  int ApexCount = 0;
+  int MatchingApexCount = 0;
   FirmwareVariableValue ApexVariable;
-  QByteArray Template;
   QByteArray PreferredTemplate;
+  QVector<ApexCandidate> ApexCandidates;
+  QVector<QByteArray> MicrosoftTemplates;
   QSet<quint16> OrderedNumbers;
   for (const quint16 Number : Order) {
     OrderedNumbers.insert(Number);
@@ -522,27 +561,66 @@ bool NativeFirmwareStore::Snapshot(QJsonObject *State, QString *Error) {
     if (!LoadOptionPath(Variable.Data, &Path, &ParseError)) {
       continue;
     }
-    if (Template.isEmpty()) {
-      Template = Variable.Data;
-    }
     if (Path.compare(
             QStringLiteral("\\EFI\\Microsoft\\Boot\\bootmgfw.efi"),
             Qt::CaseInsensitive) == 0) {
-      PreferredTemplate = Variable.Data;
+      MicrosoftTemplates.push_back(Variable.Data);
     }
     if (Path.compare(QString::fromLatin1(kApexLoaderPath), Qt::CaseInsensitive) ==
         0) {
-      ++ApexCount;
-      ApexNumber = Number;
-      ApexVariable = Variable;
+      ApexCandidates.push_back(ApexCandidate{Number, Variable});
     }
   }
-  if (ApexCount > 1) {
+
+  // mountvol /S mounts the Windows system ESP. The Microsoft boot option is
+  // therefore the authoritative partition identity for this transaction.
+  // A same-named APEX32 option on another ESP must never be reused.
+  if (MicrosoftTemplates.isEmpty()) {
     return SetError(
-        Error, QStringLiteral("Multiple active APEX32 firmware entries were found."));
+        Error,
+        QStringLiteral(
+            "Windows Boot Manager is unavailable; the Windows system ESP "
+            "cannot be identified safely."));
+  }
+  PreferredTemplate = MicrosoftTemplates.first();
+  for (qsizetype Index = 1; Index < MicrosoftTemplates.size(); ++Index) {
+    bool SameEsp = false;
+    if (!SameEspIdentity(
+            PreferredTemplate, MicrosoftTemplates.at(Index), &SameEsp, Error)) {
+      return false;
+    }
+    if (!SameEsp) {
+      return SetError(
+          Error,
+          QStringLiteral(
+              "Multiple Windows Boot Manager ESP identities were found; "
+              "installation cannot choose a partition safely."));
+    }
+  }
+  for (const ApexCandidate &Candidate : ApexCandidates) {
+    bool SameEsp = false;
+    if (!SameEspIdentity(
+            Candidate.Variable.Data,
+            PreferredTemplate,
+            &SameEsp,
+            Error)) {
+      return false;
+    }
+    if (!SameEsp) {
+      continue;
+    }
+    ++MatchingApexCount;
+    ApexNumber = Candidate.Number;
+    ApexVariable = Candidate.Variable;
+  }
+  if (MatchingApexCount > 1) {
+    return SetError(
+        Error,
+        QStringLiteral(
+            "Multiple active APEX32 entries were found on the Windows system ESP."));
   }
   if (OrderVariable.Attributes == 0 ||
-      (ApexCount == 1 && ApexVariable.Attributes == 0)) {
+      (MatchingApexCount == 1 && ApexVariable.Attributes == 0)) {
     return SetError(
         Error,
         QStringLiteral("A required UEFI variable has invalid attributes."));
@@ -563,16 +641,14 @@ bool NativeFirmwareStore::Snapshot(QJsonObject *State, QString *Error) {
       }
     }
   }
-  if (ApexNumber < 0 ||
-      (ApexCount == 0 && Template.isEmpty() && PreferredTemplate.isEmpty())) {
+  if (ApexNumber < 0) {
     return SetError(
         Error, QStringLiteral("No safe firmware boot entry or template is available."));
   }
 
   PendingBootNumber_ = ApexNumber;
-  PendingHadApex_ = ApexCount == 1;
-  PendingTemplate_ =
-      !PreferredTemplate.isEmpty() ? PreferredTemplate : Template;
+  PendingHadApex_ = MatchingApexCount == 1;
+  PendingTemplate_ = PreferredTemplate;
   State->insert(QStringLiteral("schema"), 1);
   State->insert(
       QStringLiteral("bootOrder"),
@@ -721,7 +797,7 @@ bool NativeFirmwareStore::Matches(
 bool NativeFirmwareStore::ApexIsFirst(
     const QString &LoaderPath,
     QString *Error) {
-  if (Variables_ == nullptr) {
+  if (Variables_ == nullptr || PendingBootNumber_ < 0) {
     return SetError(Error, QStringLiteral("The native firmware store is unavailable."));
   }
   FirmwareVariableValue OrderVariable;
@@ -729,6 +805,11 @@ bool NativeFirmwareStore::ApexIsFirst(
   if (!Variables_->Read(QStringLiteral("BootOrder"), &OrderVariable, Error) ||
       !DecodeBootOrder(OrderVariable, &Order, Error) || Order.isEmpty()) {
     return false;
+  }
+  if (Order.first() != static_cast<quint16>(PendingBootNumber_)) {
+    return SetError(
+        Error,
+        QStringLiteral("The prepared Windows-ESP APEX32 entry is not first."));
   }
   FirmwareVariableValue First;
   if (!Variables_->Read(BootVariableName(Order.first()), &First, Error) ||

@@ -275,8 +275,11 @@ NSIS package under the runner's temporary directory.
 
 `windows-transaction-lifecycle` uses `QTemporaryDir` plus a JSON store for the
 complete file transaction. `windows-native-firmware-store` uses only in-memory
-`Boot####` variables. Both are excluded from the package. The real variable
-lifecycle runs separately under OVMF through:
+`Boot####` variables, including distinct simulated Windows and Linux ESP
+identities. It proves that a same-path APEX32 entry on the Linux ESP is not
+reused, changed, or removed by the Windows transaction. Both tests are
+excluded from the package. The real variable lifecycle runs separately under
+OVMF through:
 
 ```bash
 ./Tools/test-qemu-ovmf-installer-lifecycle.sh

@@ -57,12 +57,17 @@ QByteArray BootOrder(std::initializer_list<quint16> Numbers) {
 QByteArray LoadOption(
     const QString &Description,
     const QString &Path,
-    quint32 Attributes = 1) {
+    quint32 Attributes = 1,
+    quint8 PartitionIdentity = 1) {
   QByteArray DevicePath;
   DevicePath.append(static_cast<char>(0x04));
   DevicePath.append(static_cast<char>(0x01));
   AppendLe16(&DevicePath, 42);
-  DevicePath.append(QByteArray(38, '\0'));
+  QByteArray HardDrivePayload(38, '\0');
+  // The GPT signature begins 20 bytes into the hard-drive node payload.
+  // A distinct byte gives the fixture a distinct ESP identity.
+  HardDrivePayload[20] = static_cast<char>(PartitionIdentity);
+  DevicePath.append(HardDrivePayload);
 
   QByteArray FilePath;
   FilePath.append(static_cast<char>(0x04));
@@ -136,7 +141,9 @@ FakeVariables InitialVariables() {
       QStringLiteral("Boot0002"),
       LoadOption(
           QStringLiteral("Linux"),
-          QStringLiteral("\\EFI\\linux\\shimx64.efi")));
+          QStringLiteral("\\EFI\\linux\\shimx64.efi"),
+          1,
+          2));
   return Variables;
 }
 
@@ -204,6 +211,51 @@ int main(int argc, char **argv) {
       QStringLiteral("an existing APEX32 entry was not restored exactly"));
 
   Variables = InitialVariables();
+  const QByteArray OtherEspApex = LoadOption(
+      QStringLiteral("APEX32 on Linux ESP"),
+      QStringLiteral("\\EFI\\APEX32\\Apex32BootManager.efi"),
+      1,
+      2);
+  Variables.Set(QStringLiteral("Boot0003"), OtherEspApex);
+  Variables.Set(QStringLiteral("BootOrder"), BootOrder({3, 1, 2}));
+  NativeFirmwareStore CrossEspStore(&Variables);
+  QJsonObject CrossEspSnapshot;
+  Require(CrossEspStore.Snapshot(&CrossEspSnapshot, &Error), Error);
+  Require(
+      !CrossEspSnapshot.value(QStringLiteral("hadApex")).toBool() &&
+          CrossEspSnapshot.value(QStringLiteral("candidateNumber")).toInt() == 4,
+      QStringLiteral("an APEX32 entry from another ESP was reused"));
+  Require(
+      CrossEspStore.PromoteApex(
+          QStringLiteral("\\EFI\\APEX32\\Apex32BootManager.efi"), &Error),
+      Error);
+  const QByteArray ExpectedWindowsEspApex = LoadOption(
+      QStringLiteral("APEX32 Secure Gateway"),
+      QStringLiteral("\\EFI\\APEX32\\Apex32BootManager.efi"),
+      1,
+      1);
+  Require(
+      Variables.Values.value(QStringLiteral("BootOrder")).Data ==
+              BootOrder({4, 3, 1, 2}) &&
+          Variables.Values.value(QStringLiteral("Boot0004")).Data ==
+              ExpectedWindowsEspApex &&
+          Variables.Values.value(QStringLiteral("Boot0003")).Data == OtherEspApex,
+      QStringLiteral(
+          "the Windows-ESP entry was not isolated from the other-ESP entry"));
+  Require(
+      CrossEspStore.ApexIsFirst(
+          QStringLiteral("\\EFI\\APEX32\\Apex32BootManager.efi"), &Error),
+      Error);
+  Require(CrossEspStore.Restore(CrossEspSnapshot, &Error), Error);
+  Require(
+      Variables.Values.value(QStringLiteral("BootOrder")).Data ==
+              BootOrder({3, 1, 2}) &&
+          !Variables.Values.contains(QStringLiteral("Boot0004")) &&
+          Variables.Values.value(QStringLiteral("Boot0003")).Data == OtherEspApex,
+      QStringLiteral(
+          "cross-ESP restore did not preserve the unrelated APEX32 entry"));
+
+  Variables = InitialVariables();
   const QByteArray InactiveApex = LoadOption(
       QStringLiteral("Inactive APEX32"),
       QStringLiteral("\\EFI\\APEX32\\Apex32BootManager.efi"),
@@ -244,6 +296,37 @@ int main(int argc, char **argv) {
           !Variables.Values.contains(QStringLiteral("Boot0003")),
       QStringLiteral("the failed promotion did not roll back cleanly"));
 
+  Variables = InitialVariables();
+  Variables.Set(
+      QStringLiteral("Boot0001"),
+      LoadOption(
+          QStringLiteral("Generic firmware entry"),
+          QStringLiteral("\\EFI\\vendor\\loader.efi")));
+  NativeFirmwareStore MissingAnchorStore(&Variables);
+  QJsonObject MissingAnchorSnapshot;
+  Error.clear();
+  Require(
+      !MissingAnchorStore.Snapshot(&MissingAnchorSnapshot, &Error) &&
+          Error.contains(QStringLiteral("Windows system ESP")),
+      QStringLiteral("a missing Windows-ESP identity did not fail closed"));
+
+  Variables = InitialVariables();
+  Variables.Set(
+      QStringLiteral("Boot0003"),
+      LoadOption(
+          QStringLiteral("Other Windows Boot Manager"),
+          QStringLiteral("\\EFI\\Microsoft\\Boot\\bootmgfw.efi"),
+          1,
+          3));
+  Variables.Set(QStringLiteral("BootOrder"), BootOrder({1, 3, 2}));
+  NativeFirmwareStore AmbiguousAnchorStore(&Variables);
+  QJsonObject AmbiguousAnchorSnapshot;
+  Error.clear();
+  Require(
+      !AmbiguousAnchorStore.Snapshot(&AmbiguousAnchorSnapshot, &Error) &&
+          Error.contains(QStringLiteral("Multiple Windows Boot Manager")),
+      QStringLiteral("ambiguous Windows-ESP identities did not fail closed"));
+
   Variables.Set(QStringLiteral("SecureBoot"), QByteArray(1, '\1'));
   bool SecureBoot = false;
   Require(ReadSecureBootState(&Variables, &SecureBoot, &Error), Error);
@@ -251,6 +334,6 @@ int main(int argc, char **argv) {
 
   std::cout
       << "PASS: native Windows firmware store created, promoted, reused, "
-         "rolled back, and restored isolated Boot variables\n";
+         "isolated multiple ESPs, rolled back, and restored Boot variables\n";
   return 0;
 }

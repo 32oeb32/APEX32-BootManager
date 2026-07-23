@@ -102,6 +102,25 @@ PR #10 creates a new candidate; it does not turn the failed first reboot into a
 pass. Linux must complete the full physical retest, and Windows must separately
 pass an isolated Windows UEFI VM plus real Windows hardware before release.
 
+## PR #11 — Windows multi-ESP identity guard
+
+Physical Linux qualification exposed a machine with separate Windows and
+Linux ESPs plus an existing APEX32 option on the Linux ESP. The Windows
+installer mounts the Windows system ESP, so filename-only boot-option reuse
+could otherwise write files to one partition while promoting an entry for the
+other.
+
+- anchor Windows transactions to the Microsoft Boot Manager hard-drive node;
+- reuse APEX32 only when its partition identity matches that Windows ESP;
+- create a separate Windows-ESP entry while preserving unrelated Linux-ESP
+  options;
+- restore only the entry owned by the Windows transaction; and
+- cover same-ESP reuse, cross-ESP isolation, and missing-identity failure with
+  in-memory firmware-variable tests.
+
+PR #11 is required before the isolated Windows UEFI VM and physical Windows
+qualification. It does not access the host ESP or firmware variables.
+
 ## 0.10.0-alpha1 — dynamic public foundation
 
 - GPL-3.0 repository foundation

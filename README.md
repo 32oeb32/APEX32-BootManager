@@ -69,6 +69,9 @@ Raw multi-ESP discovery, signed artifacts, additional distro packages, and
 broader hardware qualification remain release gates.
 The Windows package now contains the reusable transaction engine, a native
 `Boot####`/`BootOrder` backend, and the same verified EFI payload as Linux.
+Windows-side entry reuse is partition-aware: an existing APEX32 option on a
+separate Linux ESP is preserved instead of being promoted for files written to
+the Windows ESP.
 The Windows and OVMF workflows cover isolated file and firmware-variable
 lifecycle tests without touching runner firmware. See
 [boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
