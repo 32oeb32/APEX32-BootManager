@@ -1,5 +1,10 @@
 # Windows one-launch installer
 
+End users should follow
+[Install APEX32 on Windows](../../Docs/INSTALL_WINDOWS.md). The Windows package
+is not approved for physical installation until its VM and hardware
+qualification gates pass.
+
 The Windows package is the native installer for the same APEX32 firmware used
 on Linux. The release workflow produces one `APEX32-Community-Setup.exe` with
 the verified EFI application, Qt runtime, graphical scanner, transactional

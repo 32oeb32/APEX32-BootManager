@@ -98,9 +98,11 @@ after package installation.
 - preserve terminal authentication as disabled and fail closed; and
 - document the physical qualification evidence and mandatory retest sequence.
 
-PR #10 creates a new candidate; it does not turn the failed first reboot into a
-pass. Linux must complete the full physical retest, and Windows must separately
-pass an isolated Windows UEFI VM plus real Windows hardware before release.
+The PR #10 candidate subsequently passed the complete physical retest on the
+same HP/Kali machine: approved intro, exact Kali and BlackArch cards, both
+handoffs, graphical restore, and normal Kali boot afterward. Windows must
+separately pass an isolated Windows UEFI VM plus real Windows hardware before
+release.
 
 ## PR #11 — Windows multi-ESP identity guard
 
@@ -118,8 +120,9 @@ other.
 - cover same-ESP reuse, cross-ESP isolation, and missing-identity failure with
   in-memory firmware-variable tests.
 
-PR #11 is required before the isolated Windows UEFI VM and physical Windows
-qualification. It does not access the host ESP or firmware variables.
+PR #11 passed CI and was merged before the isolated Windows UEFI VM and
+physical Windows qualification. It did not access the host ESP or firmware
+variables.
 
 ## 0.10.0-alpha1 — dynamic public foundation
 

@@ -67,9 +67,11 @@ the complete GUI/reboot/restore flow, followed by physical Windows hardware.
   installing the package on the CI host.
 - Completed: install, reinstall, desktop/AppStream validation, and purge on a
   disposable CI runner that refuses hosts with an ESP or EFI variables.
-- Completed with a failed candidate: first HP/Kali install and graphical
-  restore; boot handoff failed and is tracked by the PR #10 corrective gate.
-- Corrected Linux candidate must pass every selected OS on the same hardware.
+- Completed: the corrected HP/Kali candidate passed graphical authorization,
+  install, approved intro, exact selected-card display, Kali and BlackArch
+  handoff, graphical restore, and subsequent normal Kali boot.
+- Completed: Windows boot-entry reuse is bound to the Windows ESP identity and
+  preserves same-named APEX32 entries on other ESPs.
 - Windows must pass a snapshot-backed UEFI VM before physical qualification.
 - Multi-disk and multi-ESP discovery with explicit device identity.
 - Live-hardware install, reboot, reinstall, restore, and independent recovery
@@ -94,5 +96,5 @@ is present but compile-time disabled in source builds. The test helper is not
 installed and cannot target the real ESP. A separate package workflow embeds
 the real EDK II output, enables the production helper, extracts the `.deb`
 without root, and verifies all payloads and dependencies. Remaining gates are
-live hardware, multi-ESP identity, Secure Boot, recovery media, and release
-signing.
+the Windows VM and physical qualification, broader hardware, Secure Boot,
+recovery media, and release signing.

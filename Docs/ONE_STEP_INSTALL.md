@@ -6,6 +6,8 @@ uses UAC and a setup executable.
 
 ## Linux
 
+Full instructions: [Install APEX32 on Kali Linux](INSTALL_KALI.md).
+
 The technical-user path is one shell command:
 
 ```bash
@@ -37,6 +39,9 @@ firmware image on the user's computer.
 
 ## Windows
 
+Full instructions and the current qualification warning:
+[Install APEX32 on Windows](INSTALL_WINDOWS.md).
+
 The Windows user downloads and double-clicks one file:
 
 ```text
@@ -57,8 +62,9 @@ OVMF independently exercises create, promote, restore, and remove against
 private firmware. Ordinary source builds remain `INSTALL|0`/`RESTORE|0`.
 
 The unsigned Community beta refuses installation while Secure Boot is
-enabled. A signed build and the live Windows hardware matrix remain final
-release gates.
+enabled. Linux physical qualification passed on the recorded HP/Kali machine.
+The Windows UEFI VM, physical Windows matrix, and signed build remain release
+gates.
 
 ## Shared graphical flow
 

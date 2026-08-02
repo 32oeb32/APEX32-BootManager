@@ -1,139 +1,154 @@
 # APEX32 Boot Manager Community Edition
 
-APEX32 is a native x86_64 UEFI boot manager written in freestanding C++20
-with EDK II and the Graphics Output Protocol. It is an independent boot
-manager, not a GRUB or rEFInd theme.
+[![Host tests](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/host-smoke.yml/badge.svg?branch=main)](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/host-smoke.yml)
+[![OVMF boot](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/ovmf-visual-smoke.yml/badge.svg?branch=main)](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/ovmf-visual-smoke.yml)
+[![Linux package](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/linux-package.yml/badge.svg?branch=main)](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/linux-package.yml)
+[![Windows package](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/windows-package.yml/badge.svg?branch=main)](https://github.com/32oeb32/APEX32-BootManager/actions/workflows/windows-package.yml)
 
-The Community Edition keeps the approved APEX32 Secure intro and
-cyber-interface. An installed system renders only the operating-system cards
-selected in the versioned installer configuration. Bounded read-only
-`Boot####` discovery is retained as a recovery fallback when no usable
-configuration exists.
-Cards intentionally show only the OS mark and OS name. Permanent project
-branding and recovery links are displayed beneath the cards:
+APEX32 is a native graphical x86_64 UEFI boot manager written in freestanding
+C++20 with EDK II and the Graphics Output Protocol. It is an independent boot
+manager—not a GRUB or rEFInd theme.
 
-**[apex32-secure.com](https://apex32-secure.com)**
+It discovers approved EFI loaders, presents them as scalable operating-system
+cards, and transfers control through UEFI. Linux and Windows installers use
+transactional backups, verified firmware, automatic rollback, and graphical
+recovery.
 
-This repository is a separate public product line. Do not overlay it onto a
-personal APEX32 installation or development tree.
+- **Project website:** [apex32-secure.com](https://apex32-secure.com)
+- **License:** [GPL-3.0](LICENSE)
+- **Current milestone:** `v0.11.0-beta1` release candidate
 
 ![APEX32 Community secure gateway](Docs/Images/APEX32-Community-v0.10.0-alpha1-preview.png)
 
-## Status
+## Install APEX32
 
-`0.10.0-alpha1` is the published source milestone. The merged
-`0.11.0-beta1` foundation and current one-step installer candidate add:
+| Platform | User experience | Current availability |
+|---|---|---|
+| Kali, Debian, Ubuntu | One verified command or a downloadable `.deb`, followed by the graphical installer | Physical Kali qualification passed; public beta asset pending final release publication |
+| Windows 10/11 x64 | Download one Setup executable, approve UAC, then use the graphical installer | Package and CI complete; Windows VM and physical qualification still required |
 
-- the approved pre-graphics APEX32 intro and reusable resolution-independent
-  GOP renderer;
-- a bounded configuration parser supporting up to 32 UEFI loaders;
-- authoritative same-ESP configured handoff for installer-selected systems,
-  with bounded read-only `BootOrder`/`Boot####` discovery only when no usable
-  configuration exists;
-- paged, manual-only OS selection with no countdown or autoboot;
-- bounded animated focus cross-fades plus Arrow, Tab, Home, End, and page
-  navigation;
-- a pluggable identity registry for Kali, BlackArch, Windows, Ubuntu, Fedora,
-  Arch, Debian, Mint, openSUSE, Pop!_OS, OpenCore, recovery, USB, network,
-  generic Linux, and unknown EFI loaders;
-- same-ESP loader verification before a card can boot;
-- F2 read-only diagnostics;
-- a Linux Qt 6 installer prototype with **Systems → Scan Now**;
-- graphical authorization for read-only discovery on root-only ESP mounts;
-- a fail-closed, scan-only default build whose GUI and helper both omit the
-  unfinished hardware-install path;
-- isolated Linux and Windows mock-ESP transaction tests covering verified staging,
-  duplicate-free reinstall, immutable backup, automatic rollback, persistent
-  recovery state, and full restore/uninstall semantics;
-- an OVMF visual gate that boots the real EFI application from a temporary
-  virtual ESP, then seeds a private APEX32 `Boot####` entry, promotes it to
-  first in `BootOrder`, reboots, and verifies the gateway framebuffer;
-- a transactional polkit-authorized install and restore helper;
-- a Debian package builder that embeds the verified EFI application and is
-  the only build mode that reports `INSTALL|1` and `RESTORE|1`;
-- an extracted-package CI gate covering the GUI, helper, firmware, desktop
-  launcher, icon, PolicyKit policy, dependencies, and capability mode;
-- a disposable-runner lifecycle gate that performs a real package install,
-  reinstall, and purge while refusing access to any ESP or UEFI variables;
-- real OVMF gates for removable fallback, NVRAM-first boot, Linux and Windows
-  handoffs, GRUB, and shim; and
-- host tests for firmware UI, configuration, loader handoff, firmware-entry
-  management, and recovery fallback behavior.
+### Kali Linux
 
-This is a beta candidate, not yet a universal production installer. The first
-physical HP/Kali qualification proved package safety plus graphical install and
-restore, but exposed a native-device-path boot regression. The candidate was
-restored rather than released. The corrected build must pass the same physical
-install, reboot, every-selected-OS handoff, and restore sequence before release.
-Raw multi-ESP discovery, signed artifacts, additional distro packages, and
-broader hardware qualification remain release gates.
-The Windows package now contains the reusable transaction engine, a native
-`Boot####`/`BootOrder` backend, and the same verified EFI payload as Linux.
-Windows-side entry reuse is partition-aware: an existing APEX32 option on a
-separate Linux ESP is preserved instead of being promoted for files written to
-the Windows ESP.
-The Windows and OVMF workflows cover isolated file and firmware-variable
-lifecycle tests without touching runner firmware. See
-[boot-card interactions](Docs/BOOT_CARD_INTERACTIONS.md) and the
-[Windows graphical installer](Docs/WINDOWS_PRODUCTION_INSTALLER.md) for the
-precise capability and qualification boundary.
-The first physical-machine results and the mandatory corrective retest are
-recorded in [hardware qualification](Docs/HARDWARE_QUALIFICATION.md).
-
-Installer contributors can run a root-refusing mock-ESP test and a visibly
-disabled safe GUI demo without touching their boot configuration. See
-[Installer testing](Docs/INSTALLER_TESTING.md). These contributor commands are
-temporary; packaged beta users will launch the installer from their desktop.
-
-The installer guide includes a complete fresh-clone workflow, dependency
-setup, expected test output, automatic Hyprland graphical authorization, a safe GUI
-demo, and an authorized read-only scan of the real ESP. It deliberately stops
-before installation on hardware. The source build reports `INSTALL|0`, keeps
-the Install control disabled, and rejects direct helper install requests.
-
-The tested Debian package candidate enables the final controls. It is not a
-public release until live-hardware restore, multi-ESP selection, Secure Boot,
-and release-signing gates pass. End users will download the release package,
-open it graphically, launch APEX32, select **Scan Now**, select their systems,
-choose **Install APEX32 and Make Default**, and finish. They will never copy EFI
-files or edit NVRAM by hand. See
-[Linux package and zero-terminal installation](Docs/LINUX_PACKAGE.md).
-
-The Debian-family release uses portable Qt dependency alternatives and CI
-installs the same package on both Ubuntu and Kali rolling before publication.
-It recommends a graphical PolicyKit agent and starts the known Kali Hyprland
-user service automatically before authorization. Normal users do not run a
-`systemctl` command.
-
-## One-step user installation
-
-Linux technical users run one command after choosing a trusted release:
+After the public beta release is published, a Kali user can run:
 
 ```bash
 git clone https://github.com/32oeb32/APEX32-BootManager.git && cd APEX32-BootManager && ./install.sh
 ```
 
-The launcher downloads and verifies the tested package, requests graphical
-PolicyKit authorization, installs it, and opens the GUI. It never builds EDK II
-or asks the user to copy EFI files or edit firmware variables.
+The launcher downloads the tested Debian package from the latest GitHub
+release, verifies its SHA-256, requests graphical PolicyKit authorization,
+installs the package, and opens the GUI. It does not compile EDK II or ask the
+user to edit the ESP or firmware variables.
 
-Windows users download and double-click one
-`APEX32-Community-Setup.exe`. The CI-built package embeds the verified
-firmware and enables graphical scan, install, make-default, and restore. A
-source-only contributor build remains scan-only unless it explicitly receives
-that verified firmware. See
-[one-step installation](Docs/ONE_STEP_INSTALL.md).
+Continue with the complete [Kali installation and recovery guide](Docs/INSTALL_KALI.md).
 
-The Windows package uses one normal UAC consent dialog and never asks users to
-clone the repository or type a command. The unsigned Community beta refuses
-installation while Secure Boot is enabled; signing and live-hardware
-qualification remain release gates. See the
-[GUI installer release plan](Docs/GUI_INSTALLER_PLAN.md).
+### Windows
 
-## Build the firmware
+Windows users will download and double-click:
 
-The repository directory must be named `APEX32-BootManager`. The pinned EDK II
-revision is listed in `Tools/edk2-version`.
+```text
+APEX32-Community-Setup.exe
+```
+
+The setup package contains the same verified EFI application as Linux. The GUI
+uses standard UAC, temporarily mounts the Windows system ESP, and performs
+scan, installation, make-default, and restore without PowerShell or Command
+Prompt.
+
+The Windows package is **not yet approved for physical end-user installation**.
+Complete the [Windows installation and recovery guide](Docs/INSTALL_WINDOWS.md)
+only after a qualified beta release is published.
+
+## What the graphical installer does
+
+1. Scans the selected EFI System Partition for bootable EFI applications.
+2. Lets the user choose which operating systems appear in APEX32.
+3. Verifies the packaged APEX32 firmware.
+4. Saves the previous firmware files and exact UEFI boot order.
+5. Installs one APEX32 entry and promotes it to the first boot position.
+6. Reads the result back and reports success or automatically rolls back.
+7. Provides graphical **Recovery / Restore Previous Boot Manager**.
+
+Installing the desktop package alone does not modify the ESP or `BootOrder`.
+Only the user's explicit **Install APEX32 and Make Default** action starts the
+privileged transaction.
+
+## Firmware experience
+
+- approved APEX32 Secure intro with no countdown or automatic boot;
+- resolution-independent GOP renderer with centered letterboxing;
+- dynamic one-to-32-card layout and keyboard navigation;
+- identities for Kali, BlackArch, Windows, Ubuntu, Fedora, Arch, Debian,
+  Linux Mint, openSUSE, Pop!_OS, OpenCore, recovery, USB, and network loaders;
+- a generic card for unknown EFI loaders;
+- installer-selected configurations remain authoritative;
+- same-ESP loader verification before handoff; and
+- F2 read-only diagnostics.
+
+Unknown loaders remain bootable and do not require source-code changes.
+
+## Current qualification status
+
+The corrected Linux candidate passed physical testing on an HP Victus running
+Kali/Hyprland:
+
+- graphical authorization and scan;
+- Kali and BlackArch selection only;
+- transactional installation and make-default;
+- approved intro and exactly two selected cards;
+- successful Kali and BlackArch handoffs; and
+- graphical recovery followed by a normal Kali boot.
+
+Windows packaging, native `Boot####` transactions, multi-ESP identity guards,
+and isolated rollback tests pass in CI. Before Windows publication, the exact
+package must still pass a snapshot-backed Windows UEFI VM and a physical
+Windows machine. The Community beta is unsigned and refuses installation when
+Secure Boot is enabled.
+
+See [Hardware qualification](Docs/HARDWARE_QUALIFICATION.md) for the evidence
+and remaining gates.
+
+## Safety requirements
+
+Before installing a beta:
+
+- use an x86_64 computer booted in UEFI mode;
+- keep recovery media and a known-good direct OS boot entry;
+- disable Secure Boot for the unsigned Community beta;
+- select only loaders that belong to the ESP being installed; and
+- use graphical Recovery before removing the desktop package.
+
+APEX32 never asks release users to manually copy EFI files, edit GRUB, run
+`efibootmgr`, use BCDEdit, or assign a Windows ESP drive letter.
+
+Read the [Installer security model](Docs/INSTALLER_SECURITY.md) before hardware
+qualification or packaging work.
+
+## Documentation
+
+### Users
+
+- [Kali installation and recovery](Docs/INSTALL_KALI.md)
+- [Windows installation and recovery](Docs/INSTALL_WINDOWS.md)
+- [One-step installation design](Docs/ONE_STEP_INSTALL.md)
+- [Hardware qualification](Docs/HARDWARE_QUALIFICATION.md)
+- [Troubleshooting and installer testing](Docs/INSTALLER_TESTING.md)
+
+### Contributors
+
+- [Architecture](Docs/ARCHITECTURE.md)
+- [Graphics foundation](Docs/GRAPHICS_FOUNDATION.md)
+- [Native UEFI discovery](Docs/NATIVE_BOOT_DISCOVERY.md)
+- [Configuration format](Docs/CONFIG_FORMAT.md)
+- [QEMU/OVMF testing](Docs/QEMU_OVMF_TESTING.md)
+- [Linux packaging](Docs/LINUX_PACKAGE.md)
+- [Windows production installer](Docs/WINDOWS_PRODUCTION_INSTALLER.md)
+- [Roadmap](Docs/ROADMAP.md)
+
+## Build and test from source
+
+Source builds are for contributors and intentionally remain unable to modify
+real hardware unless packaging explicitly supplies a verified EFI artifact.
 
 ```bash
 ./Tools/test-host.sh
@@ -142,77 +157,35 @@ EDK2_DIR=/path/to/edk2 \
   ./Tools/build-edk2.sh
 ```
 
-The EFI artifact is written to:
+The EFI output is:
 
 ```text
 Build/DEBUG_GCC/X64/Apex32BootManager.efi
 ```
 
-The real firmware can then be booted safely in a disposable QEMU/OVMF machine:
-
-```bash
-./Tools/test-qemu-ovmf.sh
-./Tools/test-qemu-ovmf-bootorder.sh
-./Tools/test-qemu-ovmf-native-discovery.sh
-./Tools/test-qemu-ovmf-config-precedence.sh
-./Tools/test-qemu-ovmf-handoff.sh
-./Tools/test-qemu-ovmf-linux-loaders.sh
-```
-
-See [QEMU/OVMF firmware testing](Docs/QEMU_OVMF_TESTING.md).
-Renderer internals, supported GOP behavior, scaling, and clipping guarantees
-are documented in [Graphics foundation](Docs/GRAPHICS_FOUNDATION.md).
-Native load-option parsing, ordering, bounds, and handoff are documented in
-[Native UEFI boot discovery](Docs/NATIVE_BOOT_DISCOVERY.md).
-
-## Build the Debian beta package
-
-After building the verified EFI application, contributors can produce and
-inspect the same hardware-enabled package used by CI:
-
-```bash
-./Tools/build-linux-package.sh
-
-PACKAGE="$(find Installer/Linux/package-build/packages -name '*.deb' -print -quit)"
-./Tools/test-linux-package.sh \
-  "$PACKAGE" \
-  Build/DEBUG_GCC/X64/Apex32BootManager.efi
-```
-
-These are contributor commands. Release users install the `.deb` from their
-desktop without opening a terminal.
-
-## Configuration
-
-The graphical installer generates:
-
-```text
-\EFI\APEX32\apex32.cfg
-```
-
-See [Docs/CONFIG_FORMAT.md](Docs/CONFIG_FORMAT.md) for the versioned format.
-End users are not expected to edit it.
+Run it only in disposable QEMU/OVMF test environments described in
+[QEMU/OVMF testing](Docs/QEMU_OVMF_TESTING.md).
 
 ## Repository layout
 
-- `Firmware entry`: `BootManager/`
-- `Renderer and animation`: `Renderer/`, `Animation/`, `Fonts/`, `Themes/`
-- `Dynamic boot configuration`: `Config/`
-- `Loader discovery and handoff`: `Boot/`
-- `Name-only OS interface`: `Menu/`
-- `Compiled firmware-safe marks`: `Assets/`
-- `Graphical Linux installer prototype`: `Installer/Linux/`
-- `Host tests and stubs`: `Tests/`
-- `Architecture and security documentation`: `Docs/`
+- `BootManager/` — UEFI application entry and lifecycle
+- `Renderer/`, `Animation/`, `Fonts/`, `Themes/` — graphical firmware UI
+- `Config/` — bounded installer-generated boot configuration
+- `Boot/` — discovery, device-path validation, and handoff
+- `Menu/` — dynamic cards, navigation, and interactions
+- `Assets/` — firmware-safe emblem and OS identity registry
+- `Installer/Linux/` — Qt GUI and PolicyKit helper
+- `Installer/Windows/` — Qt GUI, UAC flow, and native transaction backend
+- `Tests/` — host, package, firmware-variable, and framebuffer tests
+- `Docs/` — architecture, security, qualification, and user guides
 
-## License and safety
+## License and trademarks
 
 Copyright (C) 2026 Oussama / APEX32 Secure contributors.
 
-APEX32 is free software licensed under the
-[GNU General Public License v3.0](LICENSE). It is provided **without warranty**
-as described by GPL-3.0 sections 15 and 16. Firmware and boot-order changes
-carry inherent risk; preserve recovery media and verified backups.
+APEX32 is free software under the [GNU General Public License v3.0](LICENSE)
+and is provided **without warranty** as described by GPL-3.0 sections 15 and
+16. Firmware and boot-order changes carry inherent risk.
 
 Kali, BlackArch, Windows, Linux, UEFI, and other names or marks remain the
 property of their respective owners. Their appearance identifies compatible
